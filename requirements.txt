@@ -1,0 +1,13 @@
+anthropic
+python-dotenv
+pedalboard
+librosa
+pyloudnorm
+scipy
+numpy
+soundfile
+pydantic>=2.0
+fastapi
+gradio
+matchering
+pytest
