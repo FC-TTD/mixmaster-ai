@@ -4,7 +4,7 @@ from pathlib import Path
 
 import numpy as np
 
-from core.schemas import DSPDecisions
+from core.schemas import DSPDecisions, MixDecisions
 
 
 @dataclass
@@ -19,6 +19,7 @@ class Job:
     job_id: str = field(default_factory=lambda: str(uuid.uuid4()))
     analysis: dict = field(default_factory=dict)
     dsp_decisions: DSPDecisions | None = None
+    mix_decisions: MixDecisions | None = None
     processed_audio: np.ndarray | None = None
     loudness_lufs: float | None = None
     true_peak_dbtp: float | None = None

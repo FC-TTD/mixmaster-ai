@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(**)",
+      "Write(core/**)",
+      "Write(tests/**)",
+      "Write(CLAUDE.md)",
+      "Bash(python -m pytest*)",
+      "Bash(pip install*)",
+      "Bash(python *.py*)"
+    ],
+    "deny": [
+      "Bash(rm -rf*)",
+      "Bash(del /f*)",
+      "Write(.env*)",
+      "Write(requirements.txt)"
+    ]
+  }
+}

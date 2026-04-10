@@ -47,3 +47,55 @@ class DSPDecisions(BaseModel):
     limiter: LimiterSettings
     target_lufs: float = Field(..., ge=-23.0, le=-6.0)
     reasoning: str
+
+
+class NoiseGateSettings(BaseModel):
+    threshold_db: float = Field(-40.0, ge=-80.0, le=0.0)
+    attack_ms: float = Field(..., ge=0.1, le=50.0)
+    release_ms: float = Field(..., ge=10.0, le=500.0)
+    hold_ms: float = Field(0.0, ge=0.0, le=200.0)
+
+
+class TransientShaperSettings(BaseModel):
+    attack_boost_db: float = Field(..., ge=0.0, le=12.0)
+    sustain_cut_db: float = Field(0.0, ge=0.0, le=12.0)
+    mix: float = Field(1.0, ge=0.0, le=1.0)
+
+
+class ChannelCompSettings(BaseModel):
+    threshold_db: float = Field(..., ge=-60.0, le=0.0)
+    ratio: float = Field(..., ge=1.0, le=20.0)
+    attack_ms: float = Field(..., ge=0.1, le=100.0)
+    release_ms: float = Field(..., ge=10.0, le=1000.0)
+    makeup_gain_db: float = Field(..., ge=0.0, le=24.0)
+
+
+class ReverbSettings(BaseModel):
+    room_size: float = Field(..., ge=0.0, le=1.0)
+    damping: float = Field(..., ge=0.0, le=1.0)
+    wet_mix: float = Field(..., ge=0.0, le=0.5)
+    pre_delay_ms: float = Field(0.0, ge=0.0, le=100.0)
+
+
+class DelaySettings(BaseModel):
+    delay_ms: float = Field(..., ge=0.0, le=500.0)
+    feedback: float = Field(..., ge=0.0, le=0.8)
+    wet_mix: float = Field(..., ge=0.0, le=0.5)
+    enabled: bool = False
+
+
+class MixSettings(BaseModel):
+    vocal_gain_db: float = Field(..., ge=-12.0, le=12.0)
+    instrumental_gain_db: float = Field(..., ge=-12.0, le=12.0)
+    vocal_pan: float = Field(0.0, ge=-1.0, le=1.0)
+
+
+class MixDecisions(BaseModel):
+    noise_gate: NoiseGateSettings
+    transient_shaper: TransientShaperSettings
+    channel_eq: EQSettings
+    channel_comp: ChannelCompSettings
+    reverb: ReverbSettings
+    delay: DelaySettings
+    mix_settings: MixSettings
+    reasoning: str
