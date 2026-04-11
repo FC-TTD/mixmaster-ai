@@ -1,8 +1,6 @@
-# MixMaster AI 🎚️
+# MixMaster AI
 
-> Give it a raw audio file and a plain-English prompt. Get back a professionally mastered track.
-
-![MixMaster AI UI](docs/demo.png)
+> Give it a vocal file, an instrumental file, and a plain-English prompt. Get back a release-ready mixed and mastered track.
 
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Python 3.10+](https://img.shields.io/badge/Python-3.10+-blue.svg)](https://www.python.org/)
@@ -12,35 +10,34 @@
 
 ## What is this?
 
-Professional audio mastering costs hundreds of dollars per track and requires years of trained ears.
+Professional mixing and mastering usually means expensive studio time, specialist engineers, and a long revision cycle.
 
-**MixMaster AI eliminates that barrier.**
+**MixMaster AI removes most of that friction.**
 
-You describe what you want in plain English. Claude AI analyzes your audio, makes precise DSP decisions, and runs a full mastering chain — EQ, compression, saturation, stereo imaging, and limiting — all calibrated to your creative brief.
+You can run it in two ways:
 
-Built for producers, bedroom musicians, indie artists, and anyone who wants professional-sounding masters without the price tag.
+- Give it a finished track plus a prompt and it will master the song.
+- Give it a vocal file, an instrumental file, and a prompt and it will mix the vocal into the beat, then master the final stereo track.
+
+Claude AI analyzes the audio, chooses DSP settings from your creative brief, runs a vocal mixing chain when needed, then applies a full mastering chain to deliver a polished WAV ready for release, review, or upload.
+
+Built for producers, bedroom artists, songwriters, indie teams, and anyone who wants faster access to professional-sounding results.
 
 ---
 
 ## Features
 
-- **AI-driven DSP decisions** — Claude analyzes 13 acoustic measurements and sets every parameter
-- **Full mastering chain** — Corrective EQ → Compressor → Tonal EQ → Saturator → Stereo Imager → Limiter
-- **Plain-English prompts** — "warm vintage master for vinyl" or "loud club master with tight low end"
-- **Streaming-ready output** — targets -14 LUFS (Spotify/Apple Music), -9 LUFS (club), -23 LUFS (broadcast)
-- **True peak control** — guaranteed no inter-sample clipping
-- **Gradio UI** — drag, drop, master, download
-- **REST API** — integrate into any workflow via `/master` endpoint
-- **CLI** — scriptable, batch-friendly
-- **Multiple output formats** — 16-bit, 24-bit, 32-bit float WAV
-
----
-
-## Demo
-
-> 📸 Add your own screenshot after first run
-
-![UI Screenshot](docs/demo.png)
+- **Two production modes** - master an existing track, or mix a vocal with an instrumental and master the result
+- **AI-driven DSP decisions** - Claude analyzes the audio and sets parameters from your plain-English prompt
+- **Full vocal mixing chain** - noise gate -> transient shaper -> channel EQ -> compression -> reverb -> delay -> panning -> blend
+- **Full mastering chain** - corrective EQ -> compressor -> tonal EQ -> saturator -> stereo imager -> limiter
+- **Automatic beat looping** - short instrumentals are looped to the vocal length automatically, with no manual prep needed
+- **Plain-English control** - ask for "warm streaming master" or "tight, dry pop vocal over a punchy beat"
+- **Two REST endpoints** - `/master` for finished mixes and `/mix-and-master` for vocal + instrumental workflows
+- **Gradio UI with two upload slots** - one for the main track or vocal, one for the instrumental
+- **CLI-first workflow** - scriptable commands for both master-only and mix+master use cases
+- **Multiple output bit depths** - export 16-bit, 24-bit, or 32-bit float WAV
+- **61 tests passing** - coverage spans ingest, analysis, mixing, mastering, API, and export behavior
 
 ---
 
@@ -49,12 +46,14 @@ Built for producers, bedroom musicians, indie artists, and anyone who wants prof
 | Layer | Technology |
 |-------|-----------|
 | AI / LLM | Anthropic Claude |
-| DSP | pedalboard, scipy, numpy |
+| Mixing Engine (`core/mixer.py`) | pedalboard, scipy, numpy |
+| Mastering Engine (`core/processor.py`) | pedalboard, scipy, numpy |
 | Audio Analysis | librosa, pyloudnorm |
 | Audio I/O | soundfile |
 | API | FastAPI |
 | UI | Gradio |
 | Schemas | Pydantic v2 |
+| Testing | pytest |
 
 ---
 
@@ -116,25 +115,41 @@ python api.py
 
 Open **http://localhost:7860** in your browser.
 
-1. Upload your audio file (WAV, FLAC, AIFF, MP3, OGG)
-2. Describe what you want: *"warm master for streaming"*
-3. Choose bit depth (24-bit recommended)
-4. Click **Master**
-5. Download your mastered track
+1. Upload your main file.
+2. Optionally upload an instrumental to enable mix+master mode.
+3. Enter a prompt such as `"tight modern pop vocal, polished and streaming-ready"`.
+4. Choose bit depth.
+5. Click **Master**.
+6. Download the final WAV.
+
+Notes:
+
+- If you upload only one file, MixMaster AI runs in **master-only** mode.
+- If you upload both a vocal and an instrumental, it runs in **mix+master** mode.
+- If the beat is shorter than the vocal, looping is handled automatically.
 
 ---
 
 ### CLI
 
+Master only:
+
 ```bash
 python cli.py input.wav output.wav "warm master for streaming"
+```
+
+Mix + master:
+
+```bash
+python cli.py vocal.wav output.wav "tight modern pop vocal over a punchy beat" --instrumental beat.wav
 ```
 
 With options:
 
 ```bash
-python cli.py input.wav output.wav "loud club master" --bit-depth 16
-python cli.py input.wav output.wav "broadcast master" --api-key sk-ant-xxx
+python cli.py input.wav output.wav "broadcast master" --bit-depth 16
+python cli.py vocal.wav output.wav "wide atmospheric vocal, polished and glued" --instrumental beat.wav --bit-depth 24
+python cli.py input.wav output.wav "loud club master" --api-key sk-ant-xxx
 ```
 
 ---
@@ -147,7 +162,7 @@ Start the server:
 python api.py
 ```
 
-Send a request:
+Master-only endpoint:
 
 ```bash
 curl -X POST http://localhost:7860/master \
@@ -157,97 +172,177 @@ curl -X POST http://localhost:7860/master \
   --output mastered.wav
 ```
 
+Mix-and-master endpoint:
+
+```bash
+curl -X POST http://localhost:7860/mix-and-master \
+  -F "vocal=@vocal.wav" \
+  -F "instrumental=@beat.wav" \
+  -F "prompt=intimate centered vocal, clean low end, release-ready finish" \
+  -F "bit_depth=24" \
+  --output mixed_mastered.wav
+```
+
 ---
 
 ## How It Works
 
-```
-Input Audio
-    │
-    ▼
-┌─────────────┐
-│  Analyzer   │  ← measures 13 acoustic properties
-└─────────────┘
-    │
-    ▼
-┌─────────────┐
-│  Claude AI  │  ← reads analysis + your prompt → sets all DSP params
-└─────────────┘
-    │
-    ▼
-┌──────────────────────────────────────────────┐
-│              Processing Chain                │
-│  Corrective EQ → Compressor → Tonal EQ      │
-│  → Saturator → Stereo Imager → Limiter      │
-└──────────────────────────────────────────────┘
-    │
-    ▼
-┌─────────────┐
-│   Writer    │  ← loudness normalize + dither + export
-└─────────────┘
-    │
-    ▼
+```text
+Master-only mode:
+
+Input Track
+    |
+    v
++------------------+
+|     Analyzer     |  <- measures loudness, dynamics, tone, and stereo traits
++------------------+
+    |
+    v
++------------------+
+|    Claude AI     |  <- reads analysis + your prompt -> sets mastering params
++------------------+
+    |
+    v
++---------------------------------------------------------------+
+|                        Mastering Chain                         |
+|  Corrective EQ -> Compressor -> Tonal EQ -> Saturator         |
+|  -> Stereo Imager -> Limiter                                  |
++---------------------------------------------------------------+
+    |
+    v
++------------------+
+|      Writer      |  <- loudness normalize + dither + export
++------------------+
+    |
+    v
 Mastered WAV
+
+
+Mix + master mode:
+
+Vocal + Instrumental
+    |
+    v
++------------------+
+|  Vocal Analyzer  |  <- analyzes the vocal for mix decisions
++------------------+
+    |
+    v
++------------------+
+|    Claude AI     |  <- reads vocal analysis + prompt -> sets mix params
++------------------+
+    |
+    v
++--------------------------------------------------------------------------+
+|                              Mixing Chain                                 |
+|  Noise Gate -> Transient Shaper -> Channel EQ -> Compression              |
+|  -> Reverb -> Delay -> Panning -> Blend                                  |
++--------------------------------------------------------------------------+
+    |
+    v
+Stereo Mix
+    |
+    v
++------------------+
+|     Analyzer     |  <- re-analyzes the full mix for mastering
++------------------+
+    |
+    v
++------------------+
+|    Claude AI     |  <- sets mastering params for the mixed track
++------------------+
+    |
+    v
++---------------------------------------------------------------+
+|                        Mastering Chain                         |
+|  Corrective EQ -> Compressor -> Tonal EQ -> Saturator         |
+|  -> Stereo Imager -> Limiter                                  |
++---------------------------------------------------------------+
+    |
+    v
++------------------+
+|      Writer      |
++------------------+
+    |
+    v
+Release-ready mixed and mastered WAV
 ```
 
 ### What Claude measures
 
 | Metric | What it tells us |
-|--------|-----------------|
-| RMS dB | Overall loudness |
-| Crest factor | Dynamic range |
+|--------|------------------|
+| RMS dB | Overall signal level |
+| Crest factor | Dynamic range and punch |
 | Integrated LUFS | Perceived loudness |
-| True peak dBTP | Peak level |
-| RMS sub/low/mid/high | Frequency balance |
+| True peak dBTP | Peak ceiling and clipping risk |
+| RMS sub / low / mid / high | Tonal balance across bands |
 | Spectral centroid | Brightness |
-| Spectral flatness | Tonal vs noisy |
+| Spectral flatness | Tonal vs noisy content |
 | Stereo width | Stereo spread |
-| Low-end mono compatibility | Bass phase issues |
+| Low-end mono compatibility | Bass phase stability |
+
+These measurements are used both for vocal-aware mixing decisions and for the final mastering pass.
 
 ---
 
 ## Prompt Examples
 
-```
+```text
 "warm vintage master for vinyl"
+"clean streaming master, open top end, controlled low mids"
 "loud and punchy club master, tight low end"
-"clean streaming master, -14 LUFS"
-"broadcast master for podcast, -23 LUFS"
-"aggressive metal master, maximum loudness"
-"cinematic master, wide stereo, lots of air"
-"lo-fi master with tape saturation"
+"broadcast master for podcast, natural and intelligible"
+"tight modern pop vocal over a bright punchy beat"
+"intimate centered vocal, dry and upfront, polished for streaming"
+"wide atmospheric vocal over a cinematic instrumental, subtle delay throws"
+"aggressive trap vocal, hard-hitting beat, clean low end, loud finish"
+"indie pop mix with airy vocal, gentle glue, smooth top end"
+"lo-fi vocal over dusty instrumental, softer transients, warm final master"
 ```
 
 ---
 
 ## Project Structure
 
-```
+```text
 mixmaster-ai/
-├── cli.py              # Command-line interface
-├── api.py              # FastAPI + Gradio server
-├── requirements.txt
-├── .env.example
-│
-└── core/
-    ├── job.py          # Job dataclass + audio loader
-    ├── analyzer.py     # 13-metric audio analysis
-    ├── agent.py        # Claude AI DSP decision engine
-    ├── processor.py    # DSP chain implementation
-    ├── writer.py       # Output normalization + export
-    └── schemas.py      # Pydantic DSP parameter models
+|-- .claude/              # Claude Code team workflow files
+|-- api.py                # FastAPI + Gradio server
+|-- cli.py                # Command-line interface
+|-- CLAUDE.md             # Collaboration notes for Claude Code
+|-- requirements.txt
+|-- .env.example
+|
+|-- core/
+|   |-- job.py            # Job dataclass + audio loader
+|   |-- analyzer.py       # Audio analysis
+|   |-- agent.py          # Claude AI decision engine for mixing and mastering
+|   |-- mixer.py          # Vocal mixing chain and instrumental blending
+|   |-- processor.py      # Mastering DSP chain
+|   |-- writer.py         # Output normalization + export
+|   `-- schemas.py        # Pydantic models for mix/master settings
+|
+`-- tests/
+    |-- test_ingest.py
+    |-- test_analyzer.py
+    |-- test_agent.py
+    |-- test_api.py
+    |-- test_mixer.py
+    |-- test_processor.py
+    `-- test_writer.py
 ```
 
 ---
 
 ## Cost Guide
 
-Each mastering job makes one Claude API call.
+Master-only jobs make **one Claude call**. Mix+master jobs make **two Claude calls**: one for mixing decisions and one for mastering decisions.
 
-| Model | Cost per master |
-|-------|----------------|
-| Claude Opus | ~$0.05–$0.15 |
-| Claude Sonnet | ~$0.01–$0.03 |
+| Workflow | Claude calls | Cost estimate |
+|----------|--------------|---------------|
+| Master only | 1 | Opus: ~$0.05-$0.15 / Sonnet: ~$0.01-$0.03 |
+| Mix + master | 2 | Opus: ~$0.10-$0.30 / Sonnet: ~$0.02-$0.06 |
 
 To use a cheaper model, change `claude-opus-4-5` to `claude-sonnet-4-5` in `core/agent.py`.
 
@@ -255,6 +350,7 @@ To use a cheaper model, change `claude-opus-4-5` to `claude-sonnet-4-5` in `core
 
 ## Roadmap
 
+- [x] AI-driven vocal + instrumental mixing
 - [ ] Batch processing (master entire folders)
 - [ ] Reference track matching
 - [ ] Stems mastering
@@ -265,27 +361,17 @@ To use a cheaper model, change `claude-opus-4-5` to `claude-sonnet-4-5` in `core
 
 ---
 
-## Contributing
-
-Contributions welcome. Open an issue first for major changes.
-
-1. Fork the repo
-2. Create a feature branch (`git checkout -b feature/your-feature`)
-3. Commit your changes
-4. Push and open a Pull Request
-
----
-
 ## Author
 
 **Tanzil Ahmed**
+
 - GitHub: [@Tanzil-Ahmed](https://github.com/Tanzil-Ahmed)
 
 ---
 
 ## License
 
-Licensed under the Apache License 2.0 — see the [LICENSE](LICENSE) file for details.
+Licensed under the Apache License 2.0 - see the [LICENSE](LICENSE) file for details.
 
 ---
 
@@ -295,7 +381,3 @@ Licensed under the Apache License 2.0 — see the [LICENSE](LICENSE) file for de
 - [pedalboard](https://github.com/spotify/pedalboard) by Spotify for DSP primitives
 - [librosa](https://librosa.org) for audio analysis
 - [pyloudnorm](https://github.com/csteinmetz1/pyloudnorm) for LUFS metering
-
----
-
-> Built for musicians who deserve professional sound without professional prices.
