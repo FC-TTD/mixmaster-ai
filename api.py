@@ -9,6 +9,7 @@ from pathlib import Path
 
 import numpy as np
 import gradio as gr
+import soundfile as sf
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from fastapi.responses import FileResponse
 import uvicorn
@@ -162,8 +163,13 @@ def gradio_master(
 
     try:
         if instrumental_path:
+            instrument_input_path = instrumental_path
+            if isinstance(instrumental_path, tuple):
+                instrumental_sample_rate, instrumental_audio = instrumental_path
+                instrument_input_path = tmp_dir / "instrumental_gradio.wav"
+                sf.write(str(instrument_input_path), instrumental_audio, instrumental_sample_rate)
             job = _run_mix_and_master(
-                input_path, Path(instrumental_path), output_path, prompt, int(bit_depth)
+                input_path, Path(instrument_input_path), output_path, prompt, int(bit_depth)
             )
         else:
             job = _run_master(input_path, output_path, prompt, int(bit_depth))
