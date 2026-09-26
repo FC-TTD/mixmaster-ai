@@ -348,6 +348,14 @@ To use a cheaper model, change `claude-opus-4-5` to `claude-sonnet-4-5` in `core
 
 ---
 
+## TTD deployment
+
+The TTD release keeps the original master-only and mix-and-master workflows, with a Chinese UI and an OpenAI-compatible DSP decision path. The current internal service is `http://ttd-stage:17862/`; it uses `gpt-6-luna` through `http://aiproxy/v1`. The mastering prompt is based on the upstream project's measured audio features, DSP chain, and parameter schema. The Anthropic path remains available through `LLM_PROVIDER=anthropic`.
+
+The supported deployment definition is `docker-compose.yml` with `Dockerfile`. Put credentials in a private `.env` on the host; they are excluded from the image. See [TTD deployment record](ttd_deployment_report.md) for service checks and release verification. The older `docker-compose.preview.yml` is retained only as a rollback reference.
+
+---
+
 ## Roadmap
 
 - [x] AI-driven vocal + instrumental mixing
@@ -357,7 +365,7 @@ To use a cheaper model, change `claude-opus-4-5` to `claude-sonnet-4-5` in `core
 - [ ] MP3/AAC export
 - [ ] Preset system
 - [ ] Before/after A/B comparison in UI
-- [ ] Docker image
+- [x] Docker image (TTD release)
 
 ---
 
