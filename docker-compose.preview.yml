@@ -1,0 +1,22 @@
+services:
+  mixmaster-ai:
+    build:
+      context: .
+      dockerfile: Dockerfile.preview
+    image: mixmaster-ai:preview
+    container_name: mixmaster-ai-preview
+    restart: unless-stopped
+    ports:
+      - "17862:7860"
+    environment:
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      LLM_PROVIDER: ${LLM_PROVIDER:-openai}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-http://aiproxy/v1}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-6-luna}
+      OPENAI_REASONING_EFFORT: ${OPENAI_REASONING_EFFORT:-low}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-EMPTY}
+    volumes:
+      - mixmaster_ai_tmp:/tmp
+
+volumes:
+  mixmaster_ai_tmp:

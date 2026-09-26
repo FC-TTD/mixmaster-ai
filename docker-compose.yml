@@ -1,0 +1,39 @@
+services:
+  mixmaster-ai:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: mixmaster-ai:1.0.0-ttd
+    container_name: mixmaster-ai
+    init: true
+    restart: unless-stopped
+    stop_grace_period: 2m
+    ports:
+      - "17862:7860"
+    environment:
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      LLM_PROVIDER: ${LLM_PROVIDER:-openai}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-http://aiproxy/v1}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-6-luna}
+      OPENAI_REASONING_EFFORT: ${OPENAI_REASONING_EFFORT:-low}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-EMPTY}
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:7860/docs', timeout=5).read()"
+      interval: 30s
+      timeout: 8s
+      start_period: 60s
+      retries: 3
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    volumes:
+      - mixmaster_ai_tmp:/tmp
+
+volumes:
+  mixmaster_ai_tmp:
