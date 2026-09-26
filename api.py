@@ -174,47 +174,66 @@ def gradio_master(
         else:
             job = _run_master(input_path, output_path, prompt, int(bit_depth))
     except Exception as e:
-        return None, f"❌ Error: {str(e)}"
+        return None, f"处理失败：{str(e)}"
 
     lines = [
-        f"✓ Loudness:   {job.loudness_lufs:.1f} LUFS",
-        f"✓ True peak:  {job.true_peak_dbtp:.1f} dBTP",
-        f"✓ Bit depth:  {int(bit_depth)}-bit",
+        f"✓ 综合响度：{job.loudness_lufs:.1f} LUFS",
+        f"✓ 真峰值：{job.true_peak_dbtp:.1f} dBTP",
+        f"✓ 导出位深：{int(bit_depth)}-bit",
     ]
     if job.mix_decisions:
-        lines.append(f"\nMix Reasoning:\n{job.mix_decisions.reasoning}")
-    lines.append(f"\nMaster Reasoning:\n{job.dsp_decisions.reasoning}")
+        lines.append(f"\n贴唱混音决策：\n{job.mix_decisions.reasoning}")
+    lines.append(f"\n母带处理决策：\n{job.dsp_decisions.reasoning}")
 
     return str(output_path), "\n".join(lines)
 
 
 with gr.Blocks(title="MixMaster AI") as demo:
-    gr.Markdown("# 🎚️ MixMaster AI\nAI-powered audio mixing and mastering")
+    gr.Markdown(
+        "# MixMaster AI\n"
+        "基于大模型声学分析的自动化混音与母带引擎。\n"
+        "上传音频并输入需求，AI 将自动串联 EQ、压缩、饱和度等 DSP 链路并完成渲染。\n\n"
+        "💡 **工作模式：**\n"
+        "1. 单轨母带：仅传「主音频」，对上传的音频进行最终响度与频段标准化。\n"
+        "2. 贴唱混音：同传「干声」与「伴奏」，自动执行人声混音并做整体母带融合。"
+    )
 
     with gr.Row():
         with gr.Column():
+            gr.Markdown("**主音频**  \n请上传混音成品或人声干声。母带模式请上传完整混音；贴唱混音模式请上传人声。")
             audio_input = gr.Audio(
                 type="filepath",
-                label="Upload Audio (or Vocal for mix+master mode)",
+                label="主音频",
             )
+            gr.Markdown("**伴奏**  \n可选。上传伴奏后自动触发“贴唱混音”模式。若只需对单一音轨做母带处理，请留空。")
             instrumental_input = gr.Audio(
                 type="filepath",
-                label="Instrumental (optional — enables mix+master mode)",
+                label="伴奏",
             )
             prompt_input = gr.Textbox(
-                label="Creative Brief",
-                placeholder="e.g. warm vintage master for streaming",
+                label="声音要求",
+                placeholder="例如：提升人声清晰度使其更靠前、压制刺耳高频；对齐 YouTube 流媒体 -14 LUFS 响度标准；去除AI味，温暖点等",
+                info="AI对话，用自然语言描述目标听感或技术指标。",
             )
             bit_depth_input = gr.Radio(
                 choices=[16, 24, 32],
                 value=24,
-                label="Bit Depth",
+                label="导出位深",
+                info="16-bit：日常试听分发；24-bit：工业级交付（推荐）；32-bit float：供二次后期编辑。",
             )
-            master_btn = gr.Button("Master", variant="primary")
+            gr.Markdown("开始处理。耗时取决于原始文件时长与 GPU 并发队列。")
+            master_btn = gr.Button("开始处理", variant="primary")
 
         with gr.Column():
-            audio_output = gr.Audio(label="Mastered Audio")
-            summary_output = gr.Textbox(label="AI Reasoning", lines=12)
+            gr.Markdown("**输出音频**  \n渲染完成，可在此进行原片与母带版本的实时监听对比及无损下载。")
+            audio_output = gr.Audio(
+                label="输出音频",
+            )
+            summary_output = gr.Textbox(
+                label="处理说明",
+                lines=12,
+                info="展示大模型调用各级 DSP 插件的决策逻辑，及处理前后 LUFS、True Peak 等核心测算数据。",
+            )
 
     master_btn.click(
         fn=gradio_master,

@@ -8,6 +8,11 @@ from core.agent import decide
 from core.schemas import DSPDecisions
 
 
+@pytest.fixture(autouse=True)
+def use_mocked_anthropic_provider(monkeypatch):
+    monkeypatch.setenv("LLM_PROVIDER", "anthropic")
+
+
 @pytest.fixture
 def analysis_job(tmp_path):
     t = np.linspace(0, 2.0, int(44100 * 2), endpoint=False)
