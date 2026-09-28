@@ -23,7 +23,7 @@ def ready_job(tmp_path):
     job = load_audio(
         tmp_path / "input.wav",
         tmp_path / "output.wav",
-        "master for streaming",
+        "master this audio",
     )
 
     job.analysis = {
@@ -136,7 +136,7 @@ def test_short_mono_voice_with_sparse_peak_reaches_streaming_loudness(ready_job)
     voice[0, ready_job.sample_rate] = 10 ** (-7.5 / 20.0)
     ready_job.processed_audio = voice.astype(np.float32)
     ready_job.num_channels = 1
-    ready_job.prompt = "按照流媒体作品标准输出，-14 LUFS"
+    ready_job.prompt = "按照流媒体作品标准输出。"
 
     result_path = write(ready_job)
     data, sample_rate = sf.read(str(result_path))
@@ -144,7 +144,7 @@ def test_short_mono_voice_with_sparse_peak_reaches_streaming_loudness(ready_job)
 
     assert data.ndim == 1
     assert abs(actual_lufs + 14) <= 0.25
-    assert np.max(np.abs(data)) <= 10 ** (-0.3 / 20.0)
+    assert _true_peak(data.reshape(1, -1)) <= -1 + 0.05
 
 
 def test_mono_delivery_keeps_mono_layout(ready_job):

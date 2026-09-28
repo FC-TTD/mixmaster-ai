@@ -402,6 +402,18 @@ production capabilities, not a claim of automated broadcast certification.
 
 Numeric delivery instructions are parsed separately from the DSP settings:
 
+Briefs can select source-backed loudness and true-peak references for music,
+podcasts, broadcast television, and short video. Missing numbers come from
+one selected reference; each explicit client number overrides that reference.
+For Apple Music, QQ Music, NetEase Cloud Music, and Douyin, the app labels its
+working reference as **not an official platform loudness specification**.
+The complete [profile catalog](docs/delivery_profiles.md) lists values, official
+sources, and unsupported destinations such as theatrical DCP and long-form
+dialogue-gated television. Sample rate, bit depth, and channels are never
+silently copied from an unrelated profile. The UI separates resolved targets
+from measured output. Explicit tonal requests also activate a bounded high
+shelf or dynamic de-esser; these are starting settings for listening review.
+
 | Client instruction | Export behavior |
 | --- | --- |
 | `48 kHz` | Resample the final WAV to 48,000 Hz |

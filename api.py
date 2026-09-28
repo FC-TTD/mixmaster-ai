@@ -176,12 +176,39 @@ def gradio_master(
     except Exception as e:
         return None, f"处理失败：{str(e)}"
 
-    lines = [
+    lines = []
+    spec = job.delivery_spec
+    if spec is not None:
+        if spec.profile_name:
+            lines.append(f"交付预设：{spec.profile_name}；客户明确数值优先。")
+            if spec.profile_note:
+                lines.append(f"适用边界：{spec.profile_note}")
+            if spec.profile_source_url:
+                lines.append(f"官方依据：{spec.profile_source_url}")
+        targets = []
+        if spec.target_lufs is not None:
+            targets.append(f"{spec.target_lufs:g} LUFS")
+        if spec.max_true_peak_dbtp is not None:
+            targets.append(f"真峰值不超过 {spec.max_true_peak_dbtp:g} dBTP")
+        if spec.max_sample_peak_dbfs is not None:
+            targets.append(f"采样峰值不超过 {spec.max_sample_peak_dbfs:g} dBFS")
+        if targets:
+            lines.append("交付目标：" + "；".join(targets))
+    lines.extend([
         f"✓ 导出综合响度：{job.loudness_lufs:.1f} LUFS",
         f"✓ 导出采样峰值：{job.output_sample_peak_dbfs:.1f} dBFS",
         f"✓ 导出真峰值（4×估计）：{job.true_peak_dbtp:.1f} dBTP",
         f"✓ 导出格式：{job.output_sample_rate} Hz / {job.output_channels} 声道 / {job.output_bit_depth}-bit WAV",
-    ]
+    ])
+    applied = []
+    if job.dsp_decisions.de_esser.enabled:
+        deess = job.dsp_decisions.de_esser
+        applied.append(f"动态齿音控制 {deess.center_hz:g} Hz，最大衰减 {deess.max_reduction_db:g} dB")
+    for band in job.dsp_decisions.tonal_eq.bands:
+        if band.filter_type == "high_shelf" and band.gain_db:
+            applied.append(f"高架 EQ {band.frequency:g} Hz / {band.gain_db:+g} dB")
+    if applied:
+        lines.append("已执行听感处理：" + "；".join(applied) + "。请试听确认。")
     if job.output_is_dual_mono:
         lines.append("说明：输入为单声道；为满足立体声文件要求，左右声道使用相同信号（双单声道），没有新增立体声空间信息。")
     if job.mix_decisions:
@@ -216,7 +243,7 @@ with gr.Blocks(title="MixMaster AI") as demo:
                 )
             prompt_input = gr.Textbox(
                 label="声音要求",
-                placeholder="例如：提升人声清晰度使其更靠前、压制刺耳高频；对齐 YouTube 流媒体 -14 LUFS 响度标准；去除AI味，温暖点等",
+                placeholder="例如：按流媒体参考预设输出；提升人声清晰度；或明确指定 -14 LUFS、真峰值 -1 dBTP",
                 info="AI对话，用自然语言描述目标听感或技术指标。",
             )
             bit_depth_input = gr.Radio(

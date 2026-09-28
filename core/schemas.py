@@ -38,8 +38,15 @@ class LimiterSettings(BaseModel):
     release_ms: float = Field(..., ge=50.0, le=500.0)
 
 
+class DeEsserSettings(BaseModel):
+    enabled: bool = False
+    center_hz: float = Field(6500.0, ge=3500.0, le=10000.0)
+    max_reduction_db: float = Field(5.0, ge=0.0, le=9.0)
+
+
 class DSPDecisions(BaseModel):
     corrective_eq: EQSettings
+    de_esser: DeEsserSettings = Field(default_factory=DeEsserSettings)
     compressor: CompressorSettings
     tonal_eq: EQSettings
     saturator: SaturatorSettings

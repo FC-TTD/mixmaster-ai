@@ -115,6 +115,11 @@ def test_decide_populates_dsp_decisions(analysis_job):
     assert job.dsp_decisions.target_lufs == -14.0
     assert job.dsp_decisions.compressor.ratio == 3.0
     assert job.dsp_decisions.limiter.ceiling_dbtp == -1.0
+    assert job.delivery_spec.target_lufs == -14.0
+    assert job.delivery_spec.max_true_peak_dbtp == -1.0
+    prompt_to_model = mock_instance.messages.create.call_args.kwargs["messages"][0]["content"]
+    assert "target_lufs: -14" in prompt_to_model
+    assert "max_true_peak_dbtp: -1" in prompt_to_model
     assert job.error is None
 
 

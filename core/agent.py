@@ -4,8 +4,33 @@ import anthropic
 import numpy as np
 from openai import OpenAI
 from core.job import Job
-from core.schemas import DSPDecisions, MixDecisions
+from core.schemas import DSPDecisions, MixDecisions, EQBand
 from core.delivery import parse_delivery_spec
+import re
+
+
+def _honor_explicit_tone_request(decisions: DSPDecisions, brief: str) -> None:
+    """Keep an explicit creative request from disappearing in a neutral LLM plan."""
+    deess = bool(re.search(r"齿音(?:过重|太重|重|刺耳|明显|多)|去齿音|压(?:低|制)?齿音|sibilan|de.?ess", brief, re.I))
+    brighten = bool(re.search(r"音色太暗|声音太暗|高频(?:太弱|不足|偏弱|不够|缺失)|(?:增加|增强|提升|提亮|补足)(?:高频|亮度|空气感)", brief))
+    darken = bool(re.search(r"高频弱化|(?:削弱|压低|降低|减少)(?:高频|亮度)|高频(?:太强|过亮|刺耳)", brief))
+    if deess:
+        decisions.de_esser.enabled = True
+        decisions.de_esser.max_reduction_db = max(4.0, decisions.de_esser.max_reduction_db)
+        decisions.reasoning = decisions.reasoning.rstrip("。； ") + f"。实际启用动态齿音控制：中心 {decisions.de_esser.center_hz:g} Hz，最大衰减 {decisions.de_esser.max_reduction_db:g} dB；频点为起点，仍需听感复核"
+    if brighten and darken:
+        raise ValueError("同时要求增强与弱化高频，请明确最终方向。")
+    requested_gain = 3.5 if brighten else -3.5 if darken else None
+    if requested_gain is None:
+        return
+    shelves = [band for band in decisions.tonal_eq.bands if band.filter_type == "high_shelf"]
+    if shelves:
+        shelf = shelves[0]
+        shelf.frequency = min(max(shelf.frequency, 4500), 5500)
+        shelf.gain_db = max(shelf.gain_db, requested_gain) if brighten else min(shelf.gain_db, requested_gain)
+    else:
+        decisions.tonal_eq.bands.append(EQBand(frequency=5500, gain_db=requested_gain, q=0.7, filter_type="high_shelf"))
+    decisions.reasoning = decisions.reasoning.rstrip("。； ") + f"。实际高架 EQ：{shelf.gain_db if shelves else requested_gain:+.1f} dB，{shelf.frequency if shelves else 5500:g} Hz；避免把频谱均值当作听感证明"
 
 
 def _llm_provider() -> str:
@@ -86,7 +111,7 @@ def decide(job: Job) -> Job:
 
     system_prompt = """You set MixMaster AI mastering DSP parameters from a client brief and measured audio features. You receive numbers, not playable audio or a reference track. Do not claim to hear the track, identify a precise resonance or sibilance, or certify a delivery standard from these measurements.
 
-The implemented chain is corrective EQ → compressor → tonal EQ → saturator → M/S stereo imager → Pedalboard Limiter → export loudness adjustment. Return every DSPDecisions field. An empty EQ list, compressor ratio 1 with zero makeup, saturator mix 0, and stereo width 1 are available when a change is not justified. The imager still removes side energy below mono_low_hz, so use the lowest sensible cutoff when no bass correction is warranted.
+The implemented chain is corrective EQ → dynamic de-esser → compressor → tonal EQ → saturator → M/S stereo imager → Pedalboard Limiter → export loudness adjustment. Return every DSPDecisions field. An empty EQ list, compressor ratio 1 with zero makeup, saturator mix 0, and stereo width 1 are available when a change is not justified. The imager still removes side energy below mono_low_hz, so use the lowest sensible cutoff when no bass correction is warranted.
 
 Evidence and capability boundaries:
 - integrated_lufs measures input loudness; -70 means unavailable, not a genuinely quiet track. true_peak_dbtp is an input estimate, not the exported peak. crest_factor_db and dynamic_range_db describe dynamics.
@@ -96,8 +121,8 @@ Evidence and capability boundaries:
 
 Decision rules, in priority order:
 1. Follow explicit client numbers and creative goals where supported. Separate loudness (LUFS), sample peak (dBFS), true peak (dBTP), and file format. Never assume that mentioning a broadcaster, television, or platform defines all of its technical specifications. If a brief gives only a maximum peak, do not invent a mandatory LUFS target.
-2. If the client gives a supported LUFS target, use it. Otherwise treat the original project's -14 streaming, -9 club, and -23 broadcast as optional stylistic starting points, never universal platform standards. Without a clear destination, choose a target near the valid measured integrated loudness and preserve dynamics; if loudness is unavailable, choose a conservative target and disclose uncertainty. Peak limits are enforced after DSP; do not attempt to meet a peak limit by arbitrarily lowering target_lufs.
-3. Corrective EQ requires an explicit audible problem in the brief or defensible broad measured evidence. Do not infer a narrow notch from a band average. Use tonal EQ for requested warmth, presence, or air with restrained broad moves; otherwise leave EQ neutral.
+2. Use the resolved delivery specification below as binding for supported numeric targets. It combines the client's explicit values with missing values from exactly one source-backed profile. Client numbers always win. Do not borrow a missing number from another broadcaster or platform, or call a profile-level loudness/peak check a complete standards certification. Without a resolved target, choose near valid measured integrated loudness and preserve dynamics; if loudness is unavailable, choose a conservative target and disclose uncertainty. Peak limits are enforced after DSP; do not arbitrarily lower target_lufs.
+3. A client's explicit tonal complaint is actionable evidence of intent, even though you cannot hear the audio. For 齿音过重 enable de_esser around 5–8 kHz with about 4–6 dB maximum dynamic reduction, avoiding a broad static treble cut. For 音色太暗 or 高频不足 add a broad high shelf around 4.5–8.5 kHz, initially +2.5 to +4 dB; for 高频弱化 or 削弱高频 use -2.5 to -4 dB. Distinguish “highs are weak” from “make highs weaker”. If brightening and de-essing are both requested, use both stages. Corrective narrow EQ still needs defensible frequency evidence; do not invent a notch from a band average. An explicit requested change must produce a non-neutral stage and remain conservative enough to avoid obvious artifacts.
 4. Preserve transients. If input LUFS is within 2 LU of the chosen target, crest_factor_db is below 6 dB, or the brief requests natural dynamics, use gentle compression. For crest factor below 6 dB, the original 1.5–2.0 ratio range is an upper starting point, not a mandate to compress. Avoid extra makeup gain when no compression is needed; loudness normalization happens later.
 5. Use saturation only for a requested density or harmonic color; otherwise set mix to 0. Do not widen when measured stereo_width exceeds 1.5. If low_end_mono_compatibility exceeds 0.3, set mono_low_hz above 100 Hz; otherwise avoid unnecessary low-frequency side removal. Do not promise widening of mono input.
 6. Select limiter threshold and release for restrained sound, not delivery compliance. Keep enough headroom for the export stage. A loudness target and a strict peak ceiling may be incompatible; the exporter gives peak safety priority and reports any shortfall. Do not claim post-export compliance until the encoded file is measured.
@@ -110,6 +135,14 @@ Return exactly one JSON object matching DSPDecisions. In concise Chinese reasoni
 
     user_message = (
         f"<client_brief>\n{job.prompt}\n</client_brief>\n\n"
+        "<resolved_delivery_spec>\n"
+        f"profile: {job.delivery_spec.profile_name or 'none'}\n"
+        f"profile_note: {job.delivery_spec.profile_note or 'none'}\n"
+        f"target_lufs: {job.delivery_spec.target_lufs}\n"
+        f"max_sample_peak_dbfs: {job.delivery_spec.max_sample_peak_dbfs}\n"
+        f"max_true_peak_dbtp: {job.delivery_spec.max_true_peak_dbtp}\n"
+        "These values are enforced on the exported file; describe an applied preset as a reference, not a universal platform standard.\n"
+        "</resolved_delivery_spec>\n\n"
         "<input_audio>\n"
         f"sample_rate_hz: {job.sample_rate}\n"
         f"channels: {job.num_channels}\n"
@@ -157,6 +190,7 @@ Return exactly one JSON object matching DSPDecisions. In concise Chinese reasoni
             decisions = DSPDecisions.model_validate(tool_use_block.input)
         if job.delivery_spec.target_lufs is not None:
             decisions.target_lufs = job.delivery_spec.target_lufs
+        _honor_explicit_tone_request(decisions, job.prompt)
         job.dsp_decisions = decisions
 
     except Exception as e:

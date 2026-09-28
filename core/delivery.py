@@ -6,12 +6,18 @@ verified in code so an unsupported promise cannot become a successful export.
 from dataclasses import dataclass
 import re
 
+from core.delivery_profiles import resolve_profile
+
 
 _NUMBER = r"([+-]?\d+(?:\.\d+)?)"
 
 
 @dataclass(frozen=True)
 class DeliverySpec:
+    profile_id: str | None = None
+    profile_name: str | None = None
+    profile_source_url: str | None = None
+    profile_note: str | None = None
     sample_rate_hz: int | None = None
     channels: int | None = None
     bit_depth: int | None = None
@@ -36,8 +42,8 @@ def parse_delivery_spec(brief: str) -> DeliverySpec:
         raise ValueError("当前只能导出 WAV；不能按要求交付 MP3、AAC 或 FLAC。")
     if re.search(r"32\s*(?:-|\s)?\s*(?:bit|位)\s*PCM", text, re.I):
         raise ValueError("当前 32-bit 导出为 float WAV，不支持 32-bit 整数 PCM。")
-    if re.search(r"\b(?:EBU\s*R128|ATSC\s*A/?85|ITU[- ]?R\s*BS\.?1770)\b", text, re.I):
-        raise ValueError("当前不能认证 EBU R128、ATSC A/85 或 BS.1770 全套规范；请给出具体 LUFS、dBTP 和文件格式要求。")
+    if re.search(r"\bITU[- ]?R\s*BS\.?1770\b", text, re.I) and not re.search(r"EBU\s*R\s*128|ATSC\s*A\s*/?\s*85", text, re.I):
+        raise ValueError("ITU-R BS.1770 是测量算法，未规定单一交付响度；请指定平台、交付规范或 LUFS 与 dBTP。")
     rates = []
     for match in re.finditer(rf"(?<![\d.]){_NUMBER}\s*(k(?:hz|赫兹)|hz|赫兹|千赫)(?!\w)", text, re.I):
         rate = float(match.group(1)) * (1000 if match.group(2).lower().startswith("k") or match.group(2) == "千赫" else 1)
@@ -60,7 +66,7 @@ def parse_delivery_spec(brief: str) -> DeliverySpec:
 
     sample_peaks = [float(m.group(1)) for m in re.finditer(rf"{_NUMBER}\s*dBFS\b", text, re.I)]
     true_peaks = [float(m.group(1)) for m in re.finditer(rf"{_NUMBER}\s*dBTP\b", text, re.I)]
-    loudness = [float(m.group(1)) for m in re.finditer(rf"{_NUMBER}\s*LUFS\b", text, re.I)]
+    loudness = [float(m.group(1)) for m in re.finditer(rf"{_NUMBER}\s*(?:LUFS|LKFS)\b", text, re.I)]
     sample_peak = _single(sample_peaks, "dBFS 峰值")
     true_peak = _single(true_peaks, "dBTP 真峰值")
     target = _single(loudness, "LUFS 响度")
@@ -70,7 +76,23 @@ def parse_delivery_spec(brief: str) -> DeliverySpec:
     if target is not None and not -40 <= target <= -6:
         raise ValueError(f"目标响度 {target:g} LUFS 超出可用的 -40 至 -6 LUFS 范围。")
 
+    profile = resolve_profile(text, target, true_peak)
+    if profile:
+        target = profile.target_lufs if target is None else target
+        if true_peak is None:
+            true_peak = (
+                profile.louder_true_peak_dbtp
+                if profile.louder_true_peak_dbtp is not None
+                and profile.target_lufs is not None
+                and target > profile.target_lufs
+                else profile.max_true_peak_dbtp
+            )
+
     return DeliverySpec(
+        profile_id=profile.key if profile else None,
+        profile_name=profile.label if profile else None,
+        profile_source_url=profile.source_url if profile else None,
+        profile_note=profile.note if profile else None,
         sample_rate_hz=int(rate) if rate is not None else None,
         channels=int(channel) if channel is not None else None,
         bit_depth=int(bit) if bit is not None else None,
