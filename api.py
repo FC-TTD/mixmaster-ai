@@ -180,7 +180,10 @@ def gradio_master(
     spec = job.delivery_spec
     if spec is not None:
         if spec.profile_name:
-            lines.append(f"选用依据：{spec.profile_basis_kind}｜{spec.profile_name}。仅核对当前音频链支持的数值，不代表完整平台验收。")
+            if spec.profile_id == "short_video_mobile_reference":
+                lines.append("选用依据：短视频移动端工作参考（非平台官方标准）。")
+            else:
+                lines.append(f"选用依据：{spec.profile_basis_kind}｜{spec.profile_name}。仅核对当前音频链支持的数值，不代表完整平台验收。")
             if spec.profile_note:
                 lines.append(f"适用边界：{spec.profile_note}")
             if spec.profile_source_url:

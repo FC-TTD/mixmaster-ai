@@ -87,3 +87,24 @@ def test_video_work_reference_is_labeled_in_ui_summary():
     assert "-15 LUFS（工作参考）" in report
     assert "真峰值不超过 -1 dBTP（工作参考）" in report
     assert "官方依据：" not in report
+
+
+@pytest.mark.parametrize("platform", ["抖音", "快手", "小红书"])
+def test_short_video_reference_copy_does_not_name_another_platform(platform):
+    prompt = f"按{platform}平台标准输出"
+    job = MagicMock()
+    job.delivery_spec = parse_delivery_spec(prompt)
+    job.loudness_lufs = -15.0
+    job.output_sample_peak_dbfs = -1.3
+    job.true_peak_dbtp = -1.1
+    job.output_sample_rate = 24000
+    job.output_channels = 1
+    job.output_bit_depth = 24
+    job.output_is_dual_mono = False
+    job.mix_decisions = None
+    job.dsp_decisions = _mock_dsp_decisions()
+    with patch("api._run_master", return_value=job):
+        _, report = gradio_master("/tmp/example.wav", prompt, 24, None)
+    assert "选用依据：短视频移动端工作参考（非平台官方标准）。" in report
+    assert "适用边界：参照中国网络视听嘈杂接收环境参数；仅校验响度与真峰值。" in report
+    assert "抖音平台" not in report

@@ -38,9 +38,9 @@ PROFILES = {
         basis_kind="工作参考",
     ),
     "short_video_mobile_reference": DeliveryProfile(
-        "short_video_mobile_reference", "短视频移动端响度参考（非抖音平台标准）", -15, -1,
+        "short_video_mobile_reference", "短视频移动端", -15, -1,
         "https://www.nrta.gov.cn/art/2023/9/14/art_3715_65554.html",
-        "借用中国网络视听嘈杂接收环境的音频参数作为移动端工作参考；抖音未公布同一套固定母带数值，不代表抖音验收标准。",
+        "参照中国网络视听嘈杂接收环境参数；仅校验响度与真峰值。",
         basis_kind="工作参考",
     ),
     "cn_video_mobile_reference": DeliveryProfile(
