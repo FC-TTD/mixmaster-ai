@@ -180,16 +180,16 @@ def gradio_master(
     spec = job.delivery_spec
     if spec is not None:
         if spec.profile_name:
-            lines.append(f"交付预设：{spec.profile_name}；客户明确数值优先。")
+            lines.append(f"选用依据：{spec.profile_basis_kind}｜{spec.profile_name}。仅核对当前音频链支持的数值，不代表完整平台验收。")
             if spec.profile_note:
                 lines.append(f"适用边界：{spec.profile_note}")
             if spec.profile_source_url:
-                lines.append(f"官方依据：{spec.profile_source_url}")
+                lines.append(f"参考数值的原始来源：{spec.profile_source_url}")
         targets = []
         if spec.target_lufs is not None:
-            targets.append(f"{spec.target_lufs:g} LUFS")
+            targets.append(f"{spec.target_lufs:g} LUFS（{spec.loudness_origin}）")
         if spec.max_true_peak_dbtp is not None:
-            targets.append(f"真峰值不超过 {spec.max_true_peak_dbtp:g} dBTP")
+            targets.append(f"真峰值不超过 {spec.max_true_peak_dbtp:g} dBTP（{spec.true_peak_origin}）")
         if spec.max_sample_peak_dbfs is not None:
             targets.append(f"采样峰值不超过 {spec.max_sample_peak_dbfs:g} dBFS")
         if targets:

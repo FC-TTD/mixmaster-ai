@@ -1,32 +1,33 @@
-# 母带交付预设与官方依据
+# 单音频母带目标：规范、建议与工作参考
 
-核对日期：2026-09-29。这里列出当前单音频 WAV 链能自动执行的**响度与真峰值子集**。LKFS 与 LUFS 在 EBU R 128 中为等价单位。预设不是整套播出、编码、元数据或平台验收认证。客户明确给出的每项数值优先，缺项只从**同一个**已识别预设补齐。
+核对日期：2026-09-29。**播放端归一化目标不是母带交付要求。**本应用只能输出单声道或立体声 WAV，并测量输出文件的综合响度及 4× 估计真峰值；以下数值只构成当前能力范围内的音频目标，不等于平台验收、视频封装、节目元数据、对白门控或院线 DCP 合规。
 
-| 识别词 / 场景 | 默认综合响度 | 默认最大真峰值 | 官方依据与边界 |
-| --- | ---: | ---: | --- |
-| 未指定平台的音乐流媒体、`流媒体` | -14 LUFS | -1 dBTP | 应用参考预设，依据 [Spotify](https://support.spotify.com/bj-en/artists/article/loudness-normalization/) 与 [SoundCloud](https://help.soundcloud.com/hc/en-us/articles/360053660014-Will-SoundCloud-play-my-track-at-the-level-it-s-mastered) 的同组母带建议；并非所有平台统一标准。 |
-| Apple Music、QQ 音乐、网易云音乐、酷狗、酷我、Tidal、Amazon Music | -14 LUFS | -1 dBTP | **产品工作参考，不是这些平台公布的统一标准。**沿用 [Spotify 官方母带建议](https://support.spotify.com/bj-en/artists/article/loudness-normalization/)作为一整组可追溯的音乐母带起点；客户有发行方交付书时逐项覆盖。Apple Music 的 [官方交付资料](https://help.apple.com/itc/videoaudioassetguide/en.lproj/static.html)并未指定固定的 -14 LUFS。 |
-| Spotify | -14 LUFS | -1 dBTP | [Spotify 母带建议](https://support.spotify.com/bj-en/artists/article/loudness-normalization/)；若客户明确要求比 -14 LUFS 更响、又未指定真峰值，则配套参考上限为 -2 dBTP。 |
-| SoundCloud | -14 LUFS | -1 dBTP | [SoundCloud 母带建议](https://help.soundcloud.com/hc/en-us/articles/360053660014-Will-SoundCloud-play-my-track-at-the-level-it-s-mastered)；比 -14 LUFS 更响时配套参考上限为 -2 dBTP。 |
-| Apple Podcasts | -16 LUFS | -1 dBTP | [Apple Podcasts 音频建议](https://podcasters.apple.com/support/893-audio-requirements)；这里只处理音频响度和峰值，仍导出 WAV。 |
-| EBU R 128 | -23 LUFS | -1 dBTP | [EBU R 128（2023）](https://tech.ebu.ch/files/live/sites/tech/files/shared/r/r128.pdf)；未核验响度范围、元数据或分发链。 |
-| BBC/DPP 电视 | -23 LUFS | -1 dBTP | [BBC 文件交付规范](https://downloads.bbc.co.uk/scotland/commissioning/TechnicalDeliveryStandardsBBCFile.pdf)；不生成 AS-11 等视频交付格式。 |
-| 中国数字电视 GY/T 282 | -24 LUFS | -2 dBTP | [广电总局 GY/T 282—2014](https://www.nrta.gov.cn/module/download/downfile.jsp?classid=0&filename=d31ca72b07b042d883c165df58d40820.pdf)；机构另有交付书时以交付书为准。 |
-| 中国网络视听 GY/T 377，嘈杂环境 | -15 LUFS | -1 dBTP | [广电总局 GY/T 377—2023](https://www.nrta.gov.cn/module/download/downfile.jsp?classid=0&filename=0e71703f4538412db1a08f2089101dda.pdf)；适合车载、户外等环境。 |
-| 中国网络视听 GY/T 377，安静环境 | -24 LUFS | -1 dBTP | [同一规范](https://www.nrta.gov.cn/module/download/downfile.jsp?classid=0&filename=0e71703f4538412db1a08f2089101dda.pdf)；没有环境或目标响度时，这两版不能自动择一。 |
-| 抖音、国内短视频移动端 | -15 LUFS | -1 dBTP | **移动端工作参考，不是抖音官方母带标准。**采用 [GY/T 377—2023](https://www.nrta.gov.cn/module/download/downfile.jsp?classid=0&filename=0e71703f4538412db1a08f2089101dda.pdf)嘈杂接收环境的一整组数值；[抖音开放平台上传说明](https://open.douyin.com/platform/resource/docs/openapi/video-management/douyin/create/upload)未给出这一组固定数值。 |
-| ATSC A/85 短节目 | -24 LUFS | -2 dBTP | [ATSC A/85:2026-07 附录 M](https://www.atsc.org/wp-content/uploads/2026/07/A85-2026-07-Annex-M.pdf)；长节目需对白门控测量，当前链路不支持。 |
+客户明确给出的 LUFS/LKFS、dBTP、dBFS、采样率、声道、位深分别优先。缺少的响度或真峰值只从所选**一套**预设补齐；界面逐项显示“客户指定”或预设类型。LKFS 与 LUFS 在这些响度用法中可等同理解，但测量范围（整段还是对白）仍须区分。
 
-以下是常见目的地，但**不能据其名称自动填一组固定 LUFS / dBTP**：
+| 类别与目的地 | 依据类型 | 自动补齐的综合响度 / 真峰值 | 边界和原始资料 |
+| --- | --- | --- | --- |
+| 未点名平台的**音乐流媒体** | 工作参考 | −14 LUFS / ≤−1 dBTP | 取自 [Spotify 母带建议](https://support.spotify.com/bj-en/artists/article/loudness-normalization/)和 [SoundCloud 母带建议](https://help.soundcloud.com/hc/en-us/articles/360053660014-Will-SoundCloud-play-my-track-at-the-level-it-s-mastered)的同一组起点；不是整个行业的交付标准。 |
+| Spotify | 母带建议 | −14 LUFS / ≤−1 dBTP | [官方母带建议](https://support.spotify.com/bj-en/artists/article/loudness-normalization/)；客户指定比 −14 LUFS 更响且未指定真峰值时，参考上限改为 −2 dBTP。Spotify 播放端 Normal/Loud/Quiet 分别按 −14/−11/−19 LUFS 归一化，不能据播放模式自动改写母带目标。 |
+| SoundCloud | 母带建议 | −14 LUFS / ≤−1 dBTP | [官方母带建议](https://help.soundcloud.com/hc/en-us/articles/360053660014-Will-SoundCloud-play-my-track-at-the-level-it-s-mastered)；比 −14 LUFS 更响时真峰值参考上限为 −2 dBTP；平台播放端另做归一化。 |
+| Apple Music、QQ 音乐、网易云音乐、酷狗、酷我、Tidal、Amazon Music | **工作参考** | −14 LUFS / ≤−1 dBTP | 这是跨平台制作起点，借用 Spotify 已公开的一整组母带建议，**不是这些平台各自的官方交付要求**。Apple 的 [Digital Masters 技术资料](https://www.apple.com/in/apple-music/apple-digital-masters/docs/apple-digital-masters.pdf)不规定固定 −16 LUFS；发行商交付书优先。也不声称 Apple Digital Masters 认证。 |
+| Apple Podcasts | 制作建议 | 约 −16 LKFS / ≤−1 dBFS 真峰值 | [Apple 官方说明](https://podcasters.apple.com/support/893-audio-requirements)容差 ±1 LU。WAV/FLAC 上传还涉及至少 44.1 kHz、声道等要求；当前预设只处理响度与真峰值，不声称完成播客文件交付。 |
+| 抖音、国内短视频移动端 | **工作参考** | −15 LKFS / ≤−1 dBTP | 借用 [GY/T 377—2023](https://www.nrta.gov.cn/art/2023/9/14/art_3715_65554.html)的嘈杂接收环境目标，**不是抖音官方母带标准**。[抖音公开上传说明](https://open.douyin.com/platform/resource/docs/openapi/video-management/douyin/create/upload)未给出固定 LUFS/dBTP 组合。 |
+| 爱奇艺、优酷、腾讯视频、Bilibili 等国内网络视听平台 | **工作参考** | 默认移动端 −15 LKFS / ≤−1 dBTP；明确电视端、客厅或安静收听时 −24 LKFS / ≤−1 dBTP | 根据平台类型归入国内网络视听，借用 [GY/T 377—2023](https://www.nrta.gov.cn/art/2023/9/14/art_3715_65554.html)相应接收环境的一整组数值；**不是各平台公布的专属交付标准**。未说明接收环境时，界面明确写出移动端假设；客户数值逐项优先。 |
+| YouTube、TikTok、Instagram Reels 等在线视频平台 | **工作参考** | −15 LKFS / ≤−1 dBTP | 为保证可产出，借用中国网络视听移动端参数作为**产品制作起点**；跨地区使用并不构成 [YouTube](https://support.google.com/youtube/answer/16619284?hl=en)或其他平台官方验收。 |
+| 中国网络视听 GY/T 377—2023：嘈杂 / 安静接收环境 | 交付规范的音频子集 | −15 / −24 LKFS（各 ±2 LU）；≤−1 dBTP | [广电总局现行标准](https://www.nrta.gov.cn/art/2023/9/14/art_3715_65554.html)适用于非直播网络视听节目的制作、分发、接收；没有接收环境或明确目标时不擅选版本。 |
+| 中国数字电视 GY/T 282—2014 | 交付规范的音频子集 | −24 LKFS（±2 LU）/ ≤−2 dBTP | [广电总局标准原文](https://www.nrta.gov.cn/module/download/downfile.jsp?classid=0&filename=d31ca72b07b042d883c165df58d40820.pdf)要求按完整节目测量；机构交付书优先。 |
+| EBU R 128 | 节目响度建议 | −23 LUFS / ≤−1 dBTP | [EBU R 128](https://tech.ebu.ch/publications/r128)；完整应用还涉及响度范围与元数据。 |
+| BBC / DPP 电视 | 交付规范的音频子集 | −23 LUFS / ≤−1 dBTP | [BBC 文件交付规范](https://downloads.bbc.co.uk/scotland/commissioning/TechnicalDeliveryStandardsBBCFile.pdf)对非直播节目有更严格的 ±0.5 LU 容差，并涉及文件封装等条件。 |
+| ATSC A/85 短节目 | 节目响度建议 | −24 LKFS / ≤−2 dBTP | [ATSC A/85:2026 附录 M](https://www.atsc.org/wp-content/uploads/2026/07/A85-2026-07-Annex-M.pdf)按完整短节目测量；长节目主要测对白，不能复用这个预设宣称合规。 |
 
-| 目的地 | 当前处理 | 原因 / 官方资料 |
-| --- | --- | --- |
-| YouTube、Bilibili、优酷、爱奇艺、腾讯视频等 | 客户同时提供 LUFS 与 dBTP 时按其数值执行；缺项不借 Spotify 数值 | 当前没有核实到适用于本单音频交付的同套官方固定数值；[YouTube 官方帮助](https://support.google.com/youtube/answer/16619284?hl=en)不提供该数值组合。 |
-| Apple Digital Masters 认证 | 仅能制作参考 WAV，不声称认证 | [Apple 交付指南](https://help.apple.com/itc/videoaudioassetguide/en.lproj/static.html)要求高质量原生 24-bit 来源、允许的采样率及 AAC 编码试听；[Apple 技术说明](https://www.apple.com/in/apple-music/apple-digital-masters/docs/apple-digital-masters.pdf)未规定单一母带 LUFS。不能把 16-bit 来源升位伪装为合格源。 |
-| Netflix 长节目 / Atmos | 不自动套用 LUFS 目标 | [Netflix 交付要求](https://partnerhelp.netflixstudios.com/hc/en-us/articles/7262346654995-Post-Production-Branded-Delivery-Specifications)使用对白门控、声道和文件交付要求；当前链路只有整体综合响度测量，不能宣称完整合规。 |
-| ATSC A/85 长节目 | 需客户明确数值；不声称 A/85 认证 | [ATSC A/85:2026-07](https://www.atsc.org/wp-content/uploads/2026/07/A85-2026-07.pdf)区分长节目对白测量和短节目整体测量。 |
-| 院线电影 / DCP | 不自动生成 LUFS / dBTP 预设 | [DCI 数字电影规范](https://www.dcimovies.com/dci-specification/)涉及多声道 PCM、声道映射、DCP 与影院校准；当前单声道/立体声 WAV 链不能交付或验证 DCP，也不存在可据“电影”二字套用的统一综合响度。电影流媒体版按具体发行方交付书处理。 |
+## 只分类，不从平台名自动生成完整目标
 
-这些预设只补充标准中**可由当前单音频链可靠执行**的项目。没有统一值的采样率、声道和文件格式，保留源文件与 UI 设置；客户明确指定的格式参数仍按要求校验。达到某个 LUFS 与真峰值不等于通过平台全部验收。
+| 场景 | 原因与处理 |
+| --- | --- |
+| 平台未公布一套固定值 | 先按**平台所属内容类型**选择有清楚来源的产品工作参考，完成音频输出；界面列出分类、环境假设和数值来源。客户指定的项目参数逐项覆盖。不得将工作参考描述为平台官方要求。 |
+| EBU R 128 s2 广播内容网络分发 | [EBU 补充建议](https://tech.ebu.ch/files/live/sites/tech/files/shared/r/r128s2.pdf)以原节目 −23 LUFS 分发为首选；特定分发适配可在 −20 至 −16 LUFS，真峰值依链路确定。没有统一配对 dBTP，不能借音乐流媒体预设。 |
+| Netflix 指定品牌内容、长节目、Atmos | [Netflix 近场要求](https://partnerhelp.netflixstudios.com/hc/en-us/articles/7262346654995-Post-Production-Branded-Delivery-Specifications)包含约 −27 LKFS（±2 LU）的**对白门控**测量及 2.0/5.1 的 −2 dBTP 条件；本链路只测整段综合响度，不自动声称达到此要求。其他交付类型另按 Netflix 文件。 |
+| 院线电影、DCP | [DCI 数字电影规范](https://www.dcimovies.com/dci-specification/)涉及多声道、声道映射、影院校准及 DCP；没有一组通用的 LUFS/dBTP 可套在当前单轨 WAV 上。 |
+| Apple Digital Masters 认证 | [Apple 技术资料](https://www.apple.com/in/apple-music/apple-digital-masters/docs/apple-digital-masters.pdf)涉及源质量及编码试听，不存在固定 LUFS 可单独证明认证；本应用输出参考 WAV。 |
 
-听感诉求也按能力边界执行：明确要求“齿音过重”时使用动态齿音控制；“音色太暗 / 高频不足”用宽高架提亮；“高频弱化 / 削弱高频”用宽高架衰减。没有音频试听或参考曲，Luna 只能根据文本和频谱统计给出起点；后端会确保这些明确的方向不会退化为中性参数，最终仍应试听确认。
+用户若只写“流媒体作品”，产品按**音乐流媒体工作参考**运行；若点名爱奇艺等平台，会先按网络视听类别选参考数值，音色诉求仍照常执行。影视流媒体不会套用音乐的 −14/−1；广播内容网络分发和院线电影保留各自的能力边界。任何用户明示的数值都优先执行，输出文件由程序测量；不能达到响度与峰值组合时会报出未满足的目标。

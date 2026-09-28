@@ -16,8 +16,11 @@ _NUMBER = r"([+-]?\d+(?:\.\d+)?)"
 class DeliverySpec:
     profile_id: str | None = None
     profile_name: str | None = None
+    profile_basis_kind: str | None = None
     profile_source_url: str | None = None
     profile_note: str | None = None
+    loudness_origin: str | None = None
+    true_peak_origin: str | None = None
     sample_rate_hz: int | None = None
     channels: int | None = None
     bit_depth: int | None = None
@@ -76,9 +79,14 @@ def parse_delivery_spec(brief: str) -> DeliverySpec:
     if target is not None and not -40 <= target <= -6:
         raise ValueError(f"目标响度 {target:g} LUFS 超出可用的 -40 至 -6 LUFS 范围。")
 
+    loudness_origin = "客户指定" if target is not None else None
+    true_peak_origin = "客户指定" if true_peak is not None else None
     profile = resolve_profile(text, target, true_peak)
     if profile:
-        target = profile.target_lufs if target is None else target
+        if target is None:
+            target = profile.target_lufs
+            if target is not None:
+                loudness_origin = profile.basis_kind
         if true_peak is None:
             true_peak = (
                 profile.louder_true_peak_dbtp
@@ -87,12 +95,16 @@ def parse_delivery_spec(brief: str) -> DeliverySpec:
                 and target > profile.target_lufs
                 else profile.max_true_peak_dbtp
             )
+            true_peak_origin = profile.basis_kind
 
     return DeliverySpec(
         profile_id=profile.key if profile else None,
         profile_name=profile.label if profile else None,
+        profile_basis_kind=profile.basis_kind if profile else None,
         profile_source_url=profile.source_url if profile else None,
         profile_note=profile.note if profile else None,
+        loudness_origin=loudness_origin,
+        true_peak_origin=true_peak_origin,
         sample_rate_hz=int(rate) if rate is not None else None,
         channels=int(channel) if channel is not None else None,
         bit_depth=int(bit) if bit is not None else None,

@@ -120,6 +120,8 @@ def test_decide_populates_dsp_decisions(analysis_job):
     prompt_to_model = mock_instance.messages.create.call_args.kwargs["messages"][0]["content"]
     assert "target_lufs: -14" in prompt_to_model
     assert "max_true_peak_dbtp: -1" in prompt_to_model
+    assert "basis_kind: 工作参考" in prompt_to_model
+    assert "target_lufs_origin: 工作参考" in prompt_to_model
     assert job.error is None
 
 

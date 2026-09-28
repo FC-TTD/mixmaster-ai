@@ -11,7 +11,8 @@ from core.schemas import (
     SaturatorSettings, StereoImageSettings, LimiterSettings,
 )
 
-from api import app
+from api import app, gradio_master
+from core.delivery import parse_delivery_spec
 
 client = TestClient(app)
 
@@ -66,3 +67,23 @@ def test_master_missing_file():
         data={"prompt": "test", "bit_depth": 24},
     )
     assert response.status_code == 422
+
+
+def test_video_work_reference_is_labeled_in_ui_summary():
+    job = MagicMock()
+    job.delivery_spec = parse_delivery_spec("齿音过重，按照爱奇艺平台标准输出。")
+    job.loudness_lufs = -15.02
+    job.output_sample_peak_dbfs = -1.4
+    job.true_peak_dbtp = -1.1
+    job.output_sample_rate = 24000
+    job.output_channels = 1
+    job.output_bit_depth = 24
+    job.output_is_dual_mono = False
+    job.mix_decisions = None
+    job.dsp_decisions = _mock_dsp_decisions()
+    with patch("api._run_master", return_value=job):
+        _, report = gradio_master("/tmp/example.wav", "齿音过重，按照爱奇艺平台标准输出。", 24, None)
+    assert "工作参考｜国内网络视听平台" in report
+    assert "-15 LUFS（工作参考）" in report
+    assert "真峰值不超过 -1 dBTP（工作参考）" in report
+    assert "官方依据：" not in report

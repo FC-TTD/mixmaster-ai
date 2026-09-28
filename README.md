@@ -407,6 +407,11 @@ podcasts, broadcast television, and short video. Missing numbers come from
 one selected reference; each explicit client number overrides that reference.
 For Apple Music, QQ Music, NetEase Cloud Music, and Douyin, the app labels its
 working reference as **not an official platform loudness specification**.
+For iQIYI, Youku, Tencent Video, Bilibili, and other named video platforms,
+the app classifies the destination and chooses a clearly labeled video work
+reference so an unknown official LUFS figure does not stop creative processing.
+The default is mobile viewing; an explicit quiet/TV viewing brief selects the
+quiet reference. Neither choice claims the named platform mandates the numbers.
 The complete [profile catalog](docs/delivery_profiles.md) lists values, official
 sources, and unsupported destinations such as theatrical DCP and long-form
 dialogue-gated television. Sample rate, bit depth, and channels are never
