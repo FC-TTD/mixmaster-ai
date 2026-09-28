@@ -1,10 +1,12 @@
 import pytest
+import httpx
 import numpy as np
 import soundfile as sf
+from openai import APITimeoutError
 from pathlib import Path
 from unittest.mock import patch, MagicMock
 from core.job import load_audio
-from core.agent import decide, _validated_openai_decision
+from core.agent import MasteringPlan, _call_openai_json, decide, _openai_client, _validated_openai_decision
 from core.schemas import DSPDecisions
 
 
@@ -160,3 +162,62 @@ def test_openai_repairs_invalid_decision_once():
     assert result.target_lufs == -14
     assert call.call_count == 2
     assert "failed schema validation" in call.call_args.args[1]
+
+
+@pytest.mark.parametrize("brief, profile_id, target, peak", [
+    ("在CCTV播放", "cn_digital_tv", -24, -2),
+    ("在BBC播放", "bbc_tv", -23, -1),
+    ("在小红书播放", "short_video_mobile_reference", -15, -1),
+    ("在中央电视台播出", "cn_digital_tv", -24, -2),
+    ("在北京电视台播出", "cn_digital_tv", -24, -2),
+    ("在汽水音乐播放", "music_platform_reference", -14, -1),
+])
+def test_luna_classifies_destination_in_the_mastering_call(
+    analysis_job, monkeypatch, brief, profile_id, target, peak
+):
+    monkeypatch.setenv("LLM_PROVIDER", "openai")
+    analysis_job.prompt = brief
+    dsp = DSPDecisions.model_validate(_make_fake_response().content[-1].input)
+    plan = MasteringPlan(profile_id=profile_id, platform_type="目的地类别", dsp=dsp)
+    with patch("core.agent._validated_openai_decision", return_value=plan) as call:
+        job = decide(analysis_job)
+    assert call.call_count == 1
+    assert call.call_args.args[0] is MasteringPlan
+    assert "destination_profile_catalog" in call.call_args.args[2]
+    assert brief in call.call_args.args[2]
+    assert "including true peak" in call.call_args.args[2]
+    assert job.delivery_spec.profile_id == profile_id
+    assert job.delivery_spec.target_lufs == target
+    assert job.delivery_spec.max_true_peak_dbtp == peak
+    assert job.dsp_decisions.target_lufs == target
+    assert job.delivery_spec.loudness_origin == job.delivery_spec.profile_basis_kind
+    assert job.delivery_spec.true_peak_origin == job.delivery_spec.profile_basis_kind
+
+
+def test_luna_keeps_client_numbers_over_profile(analysis_job, monkeypatch):
+    monkeypatch.setenv("LLM_PROVIDER", "openai")
+    analysis_job.prompt = "在汽水音乐播放，-16 LUFS，真峰值不超过 -2 dBTP"
+    dsp = DSPDecisions.model_validate(_make_fake_response().content[-1].input)
+    plan = MasteringPlan(profile_id="music_platform_reference", platform_type="音乐平台", dsp=dsp)
+    with patch("core.agent._validated_openai_decision", return_value=plan):
+        job = decide(analysis_job)
+    assert job.delivery_spec.target_lufs == -16
+    assert job.delivery_spec.max_true_peak_dbtp == -2
+    assert job.dsp_decisions.target_lufs == -16
+
+
+def test_luna_client_has_bounded_timeout_and_no_hidden_retries(monkeypatch):
+    monkeypatch.setenv("OPENAI_TIMEOUT_SECONDS", "60")
+    with patch("core.agent.OpenAI") as client:
+        _openai_client()
+    assert client.call_args.kwargs["timeout"] == 60
+    assert client.call_args.kwargs["max_retries"] == 0
+
+
+def test_luna_timeout_is_readable_instead_of_leaving_queue_running():
+    with patch("core.agent._openai_client") as client:
+        client.return_value.chat.completions.create.side_effect = APITimeoutError(
+            request=httpx.Request("POST", "http://aiproxy/v1/chat/completions")
+        )
+        with pytest.raises(RuntimeError, match="等待超时"):
+            _call_openai_json("rules", "brief", {"type": "object"})

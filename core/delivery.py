@@ -6,7 +6,7 @@ verified in code so an unsupported promise cannot become a successful export.
 from dataclasses import dataclass
 import re
 
-from core.delivery_profiles import resolve_profile
+from core.delivery_profiles import PROFILES, resolve_profile
 
 
 _NUMBER = r"([+-]?\d+(?:\.\d+)?)"
@@ -37,7 +37,9 @@ def _single(values: list[float], name: str) -> float | None:
     return values[0]
 
 
-def parse_delivery_spec(brief: str) -> DeliverySpec:
+def parse_delivery_spec(
+    brief: str, *, profile_id: str | None = None, classify_with_rules: bool = True
+) -> DeliverySpec:
     text = brief.replace("−", "-").replace("–", "-").replace("—", "-")
     if re.search(r"(?:5\.1|7\.1)\s*(?:声道|surround)|杜比全景声|dolby\s*atmos", text, re.I):
         raise ValueError("当前仅支持单声道或立体声 WAV，不能交付环绕声或 Dolby Atmos。")
@@ -81,7 +83,9 @@ def parse_delivery_spec(brief: str) -> DeliverySpec:
 
     loudness_origin = "客户指定" if target is not None else None
     true_peak_origin = "客户指定" if true_peak is not None else None
-    profile = resolve_profile(text, target, true_peak)
+    if profile_id is not None and profile_id not in PROFILES:
+        raise ValueError(f"未知的交付参考预设：{profile_id}")
+    profile = resolve_profile(text, target, true_peak) if classify_with_rules else PROFILES.get(profile_id)
     if profile:
         if target is None:
             target = profile.target_lufs

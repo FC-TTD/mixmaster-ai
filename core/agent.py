@@ -2,10 +2,12 @@ import os
 import json
 import anthropic
 import numpy as np
-from openai import OpenAI
+from openai import APIConnectionError, APIStatusError, APITimeoutError, OpenAI
+from pydantic import BaseModel
 from core.job import Job
 from core.schemas import DSPDecisions, MixDecisions, EQBand
 from core.delivery import parse_delivery_spec
+from core.delivery_profiles import PROFILES
 import re
 
 
@@ -41,7 +43,16 @@ def _openai_client() -> OpenAI:
     return OpenAI(
         api_key=os.environ.get("OPENAI_API_KEY") or "EMPTY",
         base_url=os.environ.get("OPENAI_BASE_URL", "http://aiproxy/v1"),
+        timeout=float(os.environ.get("OPENAI_TIMEOUT_SECONDS", "60")),
+        max_retries=0,
     )
+
+
+class MasteringPlan(BaseModel):
+    """One Luna response selects the destination reference and all DSP settings."""
+    profile_id: str | None
+    platform_type: str
+    dsp: DSPDecisions
 
 
 def _extract_json_object(text: str) -> dict:
@@ -66,25 +77,32 @@ def _extract_json_object(text: str) -> dict:
 
 def _call_openai_json(system_prompt: str, user_message: str, schema: dict) -> dict:
     model = os.environ.get("OPENAI_MODEL", "gpt-6-luna")
-    response = _openai_client().chat.completions.create(
-        model=model,
-        temperature=float(os.environ.get("OPENAI_TEMPERATURE", "0.1")),
-        max_tokens=int(os.environ.get("OPENAI_MAX_TOKENS", "4096")),
-        reasoning_effort=os.environ.get("OPENAI_REASONING_EFFORT", "low"),
-        response_format={"type": "json_object"},
-        messages=[
-            {
-                "role": "system",
-                "content": (
-                    system_prompt
-                    + "\n\nReturn exactly one JSON object. Do not wrap it in Markdown. "
-                    "The JSON must validate against this schema:\n"
-                    + json.dumps(schema, ensure_ascii=False)
-                ),
-            },
-            {"role": "user", "content": user_message},
-        ],
-    )
+    try:
+        response = _openai_client().chat.completions.create(
+            model=model,
+            temperature=float(os.environ.get("OPENAI_TEMPERATURE", "0.1")),
+            max_tokens=int(os.environ.get("OPENAI_MAX_TOKENS", "4096")),
+            reasoning_effort=os.environ.get("OPENAI_REASONING_EFFORT", "low"),
+            response_format={"type": "json_object"},
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        system_prompt
+                        + "\n\nReturn exactly one JSON object. Do not wrap it in Markdown. "
+                        "The JSON must validate against this schema:\n"
+                        + json.dumps(schema, ensure_ascii=False)
+                    ),
+                },
+                {"role": "user", "content": user_message},
+            ],
+        )
+    except APITimeoutError as error:
+        raise RuntimeError("Luna 决策服务等待超时，请重试；本次未导出音频。") from error
+    except APIConnectionError as error:
+        raise RuntimeError("Luna 决策服务连接失败，请稍后重试；本次未导出音频。") from error
+    except APIStatusError as error:
+        raise RuntimeError(f"Luna 决策服务暂不可用（HTTP {error.status_code}），请稍后重试；本次未导出音频。") from error
     content = response.choices[0].message.content or ""
     return _extract_json_object(content)
 
@@ -107,7 +125,10 @@ def _validated_openai_decision(model_type, system_prompt: str, user_message: str
 
 def decide(job: Job) -> Job:
     job.status = "processing"
-    job.delivery_spec = parse_delivery_spec(job.prompt)
+    luna = _llm_provider() == "openai"
+    # Luna classifies the destination in the same call that selects DSP values.
+    # Parse only explicit client numbers before that call; never classify by a name regex.
+    job.delivery_spec = parse_delivery_spec(job.prompt, classify_with_rules=not luna)
 
     system_prompt = """You set MixMaster AI mastering DSP parameters from a client brief and measured audio features. You receive numbers, not playable audio or a reference track. Do not claim to hear the track, identify a precise resonance or sibilance, or certify a delivery standard from these measurements.
 
@@ -121,13 +142,13 @@ Evidence and capability boundaries:
 
 Decision rules, in priority order:
 1. Follow explicit client numbers and creative goals where supported. Separate loudness (LUFS), sample peak (dBFS), true peak (dBTP), and file format. Never assume that mentioning a broadcaster, television, or platform defines all of its technical specifications. If a brief gives only a maximum peak, do not invent a mandatory LUFS target.
-2. Use the resolved delivery specification below as binding for supported numeric targets. It combines the client's explicit values with missing values from exactly one source-backed profile. Client numbers always win. Do not borrow a missing number from another broadcaster or platform, or call a profile-level loudness/peak check a complete standards certification. Without a resolved target, choose near valid measured integrated loudness and preserve dynamics; if loudness is unavailable, choose a conservative target and disclose uncertainty. Peak limits are enforced after DSP; do not arbitrarily lower target_lufs.
+2. Use the client's explicit technical numbers as binding. If a destination profile catalog is supplied, identify the platform's content type and choose exactly one fitting profile from that catalog, even when a regional broadcaster or unfamiliar service is named. Distinguish a music listening app from a short-video app, and a television broadcaster from a network-video platform. The catalog's work references are production starting points, never a named platform's official requirement. Client numbers override individual profile numbers. If no profile fits, return null; for a destination that requires unsupported measurement or delivery (for example theatrical DCP or dialogue-gated Netflix delivery), return "unsupported". Never invent a profile identifier or borrow values from a different content type. Without a resolved target, choose near valid measured integrated loudness and preserve dynamics; if loudness is unavailable, choose a conservative target and disclose uncertainty. Peak limits are enforced after DSP; do not arbitrarily lower target_lufs.
 3. A client's explicit tonal complaint is actionable evidence of intent, even though you cannot hear the audio. For 齿音过重 enable de_esser around 5–8 kHz with about 4–6 dB maximum dynamic reduction, avoiding a broad static treble cut. For 音色太暗 or 高频不足 add a broad high shelf around 4.5–8.5 kHz, initially +2.5 to +4 dB; for 高频弱化 or 削弱高频 use -2.5 to -4 dB. Distinguish “highs are weak” from “make highs weaker”. If brightening and de-essing are both requested, use both stages. Corrective narrow EQ still needs defensible frequency evidence; do not invent a notch from a band average. An explicit requested change must produce a non-neutral stage and remain conservative enough to avoid obvious artifacts.
 4. Preserve transients. If input LUFS is within 2 LU of the chosen target, crest_factor_db is below 6 dB, or the brief requests natural dynamics, use gentle compression. For crest factor below 6 dB, the original 1.5–2.0 ratio range is an upper starting point, not a mandate to compress. Avoid extra makeup gain when no compression is needed; loudness normalization happens later.
 5. Use saturation only for a requested density or harmonic color; otherwise set mix to 0. Do not widen when measured stereo_width exceeds 1.5. If low_end_mono_compatibility exceeds 0.3, set mono_low_hz above 100 Hz; otherwise avoid unnecessary low-frequency side removal. Do not promise widening of mono input.
 6. Select limiter threshold and release for restrained sound, not delivery compliance. Keep enough headroom for the export stage. A loudness target and a strict peak ceiling may be incompatible; the exporter gives peak safety priority and reports any shortfall. Do not claim post-export compliance until the encoded file is measured.
 
-Return exactly one JSON object matching DSPDecisions. In concise Chinese reasoning, state the client goal, the measurements behind material adjustments, any neutral stages, and meaningful uncertainty. Never claim listening, verified file compliance, or effects the chain cannot perform."""
+Return exactly one JSON object matching the provided schema. In concise Chinese reasoning, state the client goal, the measurements behind material adjustments, any neutral stages, and meaningful uncertainty. Never claim listening, verified file compliance, or effects the chain cannot perform."""
 
     analysis_str = "\n".join(
         f"  {k}: {v:.6f}" for k, v in job.analysis.items()
@@ -135,7 +156,7 @@ Return exactly one JSON object matching DSPDecisions. In concise Chinese reasoni
 
     user_message = (
         f"<client_brief>\n{job.prompt}\n</client_brief>\n\n"
-        "<resolved_delivery_spec>\n"
+        "<delivery_spec>\n"
         f"profile: {job.delivery_spec.profile_name or 'none'}\n"
         f"basis_kind: {job.delivery_spec.profile_basis_kind or 'client specification'}\n"
         f"profile_note: {job.delivery_spec.profile_note or 'none'}\n"
@@ -144,8 +165,8 @@ Return exactly one JSON object matching DSPDecisions. In concise Chinese reasoni
         f"max_sample_peak_dbfs: {job.delivery_spec.max_sample_peak_dbfs}\n"
         f"max_true_peak_dbtp: {job.delivery_spec.max_true_peak_dbtp}\n"
         f"max_true_peak_dbtp_origin: {job.delivery_spec.true_peak_origin or 'none'}\n"
-        "These values are enforced on the exported file. Distinguish formal delivery specifications, mastering or production advice, playback normalization, and work references. Do not call a work reference an official requirement of the named platform.\n"
-        "</resolved_delivery_spec>\n\n"
+        "Client-specified numbers are enforced on the exported file. A selected catalog profile fills only missing values. Distinguish formal delivery specifications, mastering or production advice, playback normalization, and work references. Do not call a work reference an official requirement of the named platform.\n"
+        "</delivery_spec>\n\n"
         "<input_audio>\n"
         f"sample_rate_hz: {job.sample_rate}\n"
         f"channels: {job.num_channels}\n"
@@ -158,8 +179,45 @@ Return exactly one JSON object matching DSPDecisions. In concise Chinese reasoni
     )
 
     try:
-        if _llm_provider() == "openai":
-            decisions = _validated_openai_decision(DSPDecisions, system_prompt, user_message)
+        if luna:
+            catalog = "\n".join(
+                f"{key}: {profile.label}; {profile.basis_kind}; "
+                f"{profile.target_lufs} LUFS; {profile.max_true_peak_dbtp} dBTP; {profile.note}"
+                for key, profile in PROFILES.items()
+            )
+            luna_message = (
+                user_message
+                + "\n<destination_profile_catalog>\n"
+                + catalog
+                + "\n</destination_profile_catalog>\n"
+                + "Infer the customer's intended distribution medium from natural language, including phrases such as '在…播放'. "
+                "CCTV/中央电视台 and regional Chinese television stations mean Chinese digital television "
+                "(cn_digital_tv: -24 LUFS and <=-2 dBTP); BBC television means bbc_tv "
+                "(-23 LUFS and <=-1 dBTP); Xiaohongshu/小红书 short-form posts mean "
+                "short_video_mobile_reference (-15 LUFS and <=-1 dBTP). "
+                "A music listening app, even one owned by a short-video company, uses music_platform_reference. "
+                "These examples explain content types; classify other destinations by type, not by brand lookup. "
+                "Choose one profile_id, never combine profiles. Return profile_id, platform_type, and dsp "
+                "in the same response. Use the chosen profile's loudness as dsp.target_lufs unless the "
+                "client supplied one. Treat each missing number independently, including true peak."
+            )
+            plan = _validated_openai_decision(MasteringPlan, system_prompt, luna_message)
+            selected = plan.profile_id
+            if selected == "unsupported":
+                if job.delivery_spec.target_lufs is None or job.delivery_spec.max_true_peak_dbtp is None:
+                    raise ValueError("该交付场景需要当前链路不支持的测量或格式；请提供可在单轨 WAV 上执行的 LUFS 与 dBTP 目标。")
+                selected = None
+            if selected is not None and selected not in PROFILES:
+                raise ValueError(f"Luna 返回了未知的交付参考预设：{selected}")
+            job.delivery_spec = parse_delivery_spec(
+                job.prompt, profile_id=selected, classify_with_rules=False
+            )
+            decisions = plan.dsp
+            if selected:
+                decisions.reasoning = (
+                    f"目的地类别：{plan.platform_type}；采用{job.delivery_spec.profile_basis_kind}“"
+                    f"{job.delivery_spec.profile_name}”。" + decisions.reasoning
+                )
         else:
             client = anthropic.Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
             tool = {

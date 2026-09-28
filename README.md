@@ -402,9 +402,14 @@ production capabilities, not a claim of automated broadcast certification.
 
 Numeric delivery instructions are parsed separately from the DSP settings:
 
-Briefs can select source-backed loudness and true-peak references for music,
-podcasts, broadcast television, and short video. Missing numbers come from
-one selected reference; each explicit client number overrides that reference.
+For one uploaded audio file, Luna interprets the destination and chooses the
+source-backed reference in the same response as its DSP settings. For example,
+`在CCTV播放` selects Chinese digital television (-24 LUFS, at most -2 dBTP),
+`在BBC播放` selects BBC/DPP television (-23 LUFS, at most -1 dBTP), and
+`在小红书播放` selects the short-video mobile *working reference* (-15 LUFS,
+at most -1 dBTP). Missing numbers come from one selected reference; each
+explicit client number overrides that reference independently. The model call
+has a 60-second upstream timeout and returns a visible error if it expires.
 For Apple Music, QQ Music, NetEase Cloud Music, and Douyin, the app labels its
 working reference as **not an official platform loudness specification**.
 For iQIYI, Youku, Tencent Video, Bilibili, and other named video platforms,

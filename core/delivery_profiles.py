@@ -34,7 +34,7 @@ PROFILES = {
     "music_platform_reference": DeliveryProfile(
         "music_platform_reference", "音乐平台通用母带参考（非指定平台标准）", -14, -1,
         "https://support.spotify.com/bj-en/artists/article/loudness-normalization/",
-        "Apple Music、QQ 音乐、网易云音乐等未核实到同一套官方固定 LUFS/dBTP；使用可追溯的通用音乐母带参考，不宣称满足该平台专属标准。",
+        "该音乐平台未核实到一套官方固定 LUFS/dBTP；使用可追溯的通用音乐母带参考，不宣称满足该平台专属标准。",
         basis_kind="工作参考",
     ),
     "short_video_mobile_reference": DeliveryProfile(
@@ -90,7 +90,7 @@ PROFILES = {
     "bbc_tv": DeliveryProfile(
         "bbc_tv", "BBC/DPP 电视响度参考", -23, -1,
         "https://downloads.bbc.co.uk/scotland/commissioning/TechnicalDeliveryStandardsBBCFile.pdf",
-        "仅核对响度与真峰值；不生成 AS-11 文件或节目元数据。",
+        "BBC/DPP 文件规范对非直播完整节目要求 -23 LUFS（±0.5 LU）；建议真峰值不超过 -3 dBTP，超过 -1 dBTP 会被拒收。本预设取 -1 dBTP 验收上限；仅核对音频数值，不生成 AS-11 文件或节目元数据。",
         basis_kind="交付规范",
     ),
     "cn_digital_tv": DeliveryProfile(
