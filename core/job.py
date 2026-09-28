@@ -26,6 +26,8 @@ class Job:
     true_peak_dbtp: float | None = None
     delivery_spec: DeliverySpec | None = None
     output_sample_rate: int | None = None
+    output_channels: int | None = None
+    output_is_dual_mono: bool = False
     output_bit_depth: int | None = None
     output_sample_peak_dbfs: float | None = None
     status: str = "pending"

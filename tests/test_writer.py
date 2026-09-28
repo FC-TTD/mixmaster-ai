@@ -133,3 +133,18 @@ def test_mono_delivery_keeps_mono_layout(ready_job):
     ready_job.prompt = "单声道 24-bit PCM"
     result_path = write(ready_job)
     assert sf.info(str(result_path)).channels == 1
+
+
+def test_mono_input_can_meet_stereo_file_spec_as_dual_mono(ready_job):
+    ready_job.processed_audio = ready_job.processed_audio[:1]
+    ready_job.num_channels = 1
+    ready_job.prompt = "立体声 48 kHz / 24-bit PCM，最大峰值不得超过 -12 dBFS"
+    result_path = write(ready_job)
+    data, sample_rate = sf.read(str(result_path), always_2d=True)
+    assert sample_rate == 48000
+    assert sf.info(str(result_path)).subtype == "PCM_24"
+    assert data.shape[1] == 2
+    np.testing.assert_array_equal(data[:, 0], data[:, 1])
+    assert np.max(np.abs(data)) <= 10 ** (-12 / 20)
+    assert ready_job.output_channels == 2
+    assert ready_job.output_is_dual_mono

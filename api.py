@@ -180,8 +180,10 @@ def gradio_master(
         f"✓ 导出综合响度：{job.loudness_lufs:.1f} LUFS",
         f"✓ 导出采样峰值：{job.output_sample_peak_dbfs:.1f} dBFS",
         f"✓ 导出真峰值（4×估计）：{job.true_peak_dbtp:.1f} dBTP",
-        f"✓ 导出格式：{job.output_sample_rate} Hz / {job.num_channels} 声道 / {job.output_bit_depth}-bit WAV",
+        f"✓ 导出格式：{job.output_sample_rate} Hz / {job.output_channels} 声道 / {job.output_bit_depth}-bit WAV",
     ]
+    if job.output_is_dual_mono:
+        lines.append("说明：输入为单声道；为满足立体声文件要求，左右声道使用相同信号（双单声道），没有新增立体声空间信息。")
     if job.mix_decisions:
         lines.append(f"\n贴唱混音决策：\n{job.mix_decisions.reasoning}")
     lines.append(f"\n母带处理决策：\n{job.dsp_decisions.reasoning}")

@@ -41,7 +41,9 @@ def write(job: Job, bit_depth: int = 24) -> Path:
     spec = job.delivery_spec or parse_delivery_spec(job.prompt)
     bit_depth = spec.bit_depth or bit_depth
     sample_rate = spec.sample_rate_hz or job.sample_rate
-    if spec.channels is not None and spec.channels != job.num_channels:
+    if spec.channels is not None and spec.channels != job.num_channels and not (
+        job.num_channels == 1 and spec.channels == 2
+    ):
         raise ValueError(
             f"要求 {spec.channels} 声道，但输入是 {job.num_channels} 声道；当前母带链不能可靠地变换声道布局。"
         )
@@ -52,11 +54,15 @@ def write(job: Job, bit_depth: int = 24) -> Path:
     if sample_rate != job.sample_rate:
         common = gcd(sample_rate, job.sample_rate)
         audio = resample_poly(audio, sample_rate // common, job.sample_rate // common, axis=1)
+    dual_mono = job.num_channels == 1 and spec.channels == 2
+    if dual_mono:
+        # Stereo PCM delivery from a mono source: identical L/R, no invented width.
+        audio = np.repeat(audio, 2, axis=0)
     if not np.all(np.isfinite(audio)):
         raise ValueError("处理后的音频包含无效采样值，无法安全导出。")
 
     meter = pyloudnorm.Meter(sample_rate)
-    measured = float(meter.integrated_loudness(audio.T if job.num_channels == 2 else audio[0]))
+    measured = float(meter.integrated_loudness(audio.T if audio.shape[0] == 2 else audio[0]))
     if not np.isfinite(measured):
         raise ValueError("音频过短或过静，无法测量综合响度。")
     target = spec.target_lufs if spec.target_lufs is not None else job.dsp_decisions.target_lufs
@@ -89,7 +95,7 @@ def write(job: Job, bit_depth: int = 24) -> Path:
     errors = []
     if actual_rate != sample_rate:
         errors.append("采样率不符")
-    if actual.shape[0] != job.num_channels:
+    if actual.shape[0] != (spec.channels or job.num_channels):
         errors.append("声道数不符")
     if sf.info(str(job.output_path)).subtype != subtype:
         errors.append("编码位深不符")
@@ -106,6 +112,8 @@ def write(job: Job, bit_depth: int = 24) -> Path:
         raise ValueError("交付要求未满足：" + "；".join(errors))
 
     job.output_sample_rate = actual_rate
+    job.output_channels = actual.shape[0]
+    job.output_is_dual_mono = dual_mono
     job.output_bit_depth = bit_depth
     job.output_sample_peak_dbfs = actual_peak
     job.true_peak_dbtp = actual_true_peak

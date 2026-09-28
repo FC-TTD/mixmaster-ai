@@ -405,7 +405,7 @@ Numeric delivery instructions are parsed separately from the DSP settings:
 | Client instruction | Export behavior |
 | --- | --- |
 | `48 kHz` | Resample the final WAV to 48,000 Hz |
-| `立体声` / `单声道` | Verify the uploaded or mixed audio has the requested channel layout; do not invent missing stereo information |
+| `立体声` / `单声道` | Keep an existing matching layout. If a mono input requests stereo delivery, duplicate it to identical L/R channels and label the result dual mono; do not invent stereo width. A stereo input requesting mono remains unsupported. |
 | `16-bit`, `24-bit PCM`, `32-bit float` | Select the corresponding WAV subtype; an explicit brief overrides the UI's default 24-bit selection |
 | `最大峰值 -12 dBFS` | Enforce and verify the *sample* peak of the encoded WAV |
 | `真峰值 -1 dBTP` | Enforce and verify a 4× oversampled *true-peak estimate* on both encoded channels |
@@ -413,7 +413,7 @@ Numeric delivery instructions are parsed separately from the DSP settings:
 
 If the LUFS target and peak limit cannot both be met, the peak limit takes
 priority and the request fails with the measured shortfall. An unsupported bit
-depth, conflicting numeric values, an unavailable channel layout, or a request
+depth, conflicting numeric values, an unsupported channel conversion, or a request
 for surround/Atmos or compressed output also fails with a clear message. The
 service does not certify every requirement of EBU R128, ATSC A/85, or BS.1770.
 For such deliveries, the client should provide the exact numeric/file specs and
