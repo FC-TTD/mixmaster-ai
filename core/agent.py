@@ -6,7 +6,6 @@ from openai import OpenAI
 from core.job import Job
 from core.schemas import DSPDecisions, MixDecisions
 from core.delivery import parse_delivery_spec
-from core.mix_context import mix_input_features
 
 
 def _llm_provider() -> str:
@@ -168,36 +167,37 @@ Return exactly one JSON object matching DSPDecisions. In concise Chinese reasoni
     return job
 
 
-def decide_mix(job: Job, instrumental_job: Job) -> Job:
+def decide_mix(job: Job) -> Job:
     job.status = "processing"
 
     system_prompt = (
-        "Set vocal mixing parameters from the client brief and measured vocal AND instrumental features. You do not hear either track.\n"
+        "You are a professional mixing engineer with 20 years of experience in vocal production.\n"
+        "You will receive measured audio analysis data and a client's creative brief.\n"
+        "Your job is to set precise mixing parameters to blend a vocal with an instrumental backing track.\n"
         "\n"
-        "The implemented chain is noise gate → transient shaper → VOCAL-only EQ → vocal compression → reverb → delay → center panning → blend. After vocal processing, the mixer peak-normalizes the vocal and instrumental separately, then applies their relative gain settings. The instrumental is not EQ'd.\n"
+        "The mixing chain order is: noise gate → transient shaper → channel EQ → compression → reverb → delay → panning → blend.\n"
         "\n"
         "Rules:\n"
-        "- The original project's raw-RMS >12 dB vocal boost rule is unreliable here because both stems are peak-normalized before blending. Use the supplied post_peak_normalization levels as a broad starting point for vocal_gain_db and instrumental_gain_db. Long pauses and vocal processing can change the actual balance; do not apply an automatic 12 dB boost. Favor moderate adjustments consistent with the requested vocal prominence.\n"
-        "- Both stems' 300–3000 Hz RMS values describe broad energy overlap, not proven masking or an exact conflicting frequency. Do not automatically cut vocal mids based on spectral centroid; that can reduce intelligibility. Use restrained vocal EQ, level balance, or less reverb when the brief requests clarity. This chain cannot carve the instrumental EQ.\n"
-        "- A global RMS cannot identify breaths, noise floor, or consonants. Use a gentle gate or near-neutral transient settings unless the brief and measurements justify stronger processing; protect quiet syllables.\n"
-        "- For intimate, close, spoken, or dry vocals, reverb wet_mix must be <=0.35; for an explicitly dry request use near-zero wet mix. Delay must be disabled unless echo/delay is requested.\n"
-        "- vocal_pan must be 0.0 (center). Use instrumental_gain_db and vocal_gain_db for relative balance, while avoiding excessive gain on either stem.\n"
-        "- Explain the client goal, both stems' relevant measurements, the chosen balance, and uncertainty in concise Chinese. Do not claim to have listened or to have fixed a precise frequency without evidence."
+        "- If vocal RMS is more than 12dB below instrumental RMS, compensate with a positive vocal_gain_db\n"
+        "- If spectral centroid of the vocal clashes with the instrumental mid range (300–3000 Hz), apply a channel EQ cut in that region\n"
+        "- reverb wet_mix must not exceed 0.35 for intimate or close vocal styles (spoken word, whisper, confessional)\n"
+        "- delay must be disabled (enabled: false) unless the prompt explicitly requests echo or delay\n"
+        "- vocal_pan must always be 0.0 (center); use instrumental_gain_db for level balance only\n"
+        "- Always provide reasoning explaining your decisions\n"
+        "- The reasoning field must be written in concise Chinese"
     )
 
     analysis_str = "\n".join(
         f"  {k}: {v:.6f}" for k, v in job.analysis.items()
     )
 
-    mix_features = mix_input_features(job, instrumental_job)
     user_message = (
-        f"<client_brief>\n{job.prompt}\n</client_brief>\n\n"
-        f"<vocal_audio sample_rate_hz=\"{job.sample_rate}\" channels=\"{job.num_channels}\" duration_seconds=\"{job.duration_seconds:.3f}\">\n"
-        f"{analysis_str}\n</vocal_audio>\n\n"
-        f"<instrumental_audio sample_rate_hz=\"{instrumental_job.sample_rate}\" channels=\"{instrumental_job.num_channels}\" duration_seconds=\"{instrumental_job.duration_seconds:.3f}\">\n"
-        f"{json.dumps(mix_features['instrumental'], ensure_ascii=False)}\n</instrumental_audio>\n\n"
-        f"<pre_mix_relative_levels>\n{json.dumps(mix_features, ensure_ascii=False)}\n</pre_mix_relative_levels>\n\n"
-        "Return mixing parameters matching the actual chain and the available evidence."
+        f"CLIENT BRIEF: {job.prompt}\n"
+        "\n"
+        "VOCAL AUDIO ANALYSIS:\n"
+        f"{analysis_str}\n"
+        "\n"
+        "Call set_mix_decisions with appropriate mixing parameters."
     )
 
     try:

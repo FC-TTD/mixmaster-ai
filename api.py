@@ -18,7 +18,6 @@ from core.job import load_audio
 from core.analyzer import analyze
 from core.agent import decide, decide_mix
 from core.mixer import mix_tracks
-from core.mix_context import align_instrumental
 from core.processor import process
 from core.writer import write
 
@@ -50,10 +49,9 @@ def _run_mix_and_master(
     """Mode 2 — mix vocal + instrumental, then master."""
     vocal_job = load_audio(vocal_path, output_path, prompt)
     instr_job = load_audio(instr_path, output_path, prompt)
-    instr_job = align_instrumental(instr_job, vocal_job.sample_rate)
 
     vocal_job = analyze(vocal_job)
-    vocal_job = decide_mix(vocal_job, instr_job)
+    vocal_job = decide_mix(vocal_job)
 
     mixed_audio = mix_tracks(
         vocal_job.audio,

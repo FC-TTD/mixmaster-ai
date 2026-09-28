@@ -425,15 +425,13 @@ measured after loudness normalization, sample-rate conversion, and quantization.
 A 4× true-peak estimate helps prevent intersample overshoot but is not a formal
 broadcast compliance certificate.
 
-The decision prompt retains the upstream project's useful dynamics and stereo
-heuristics (within 2 LU, crest factor below 6 dB, width above 1.5, and bass
-side/mid ratio above 0.3), but treats them as evidence rather than automatic
-processing commands. It keeps LUFS separate from peak limits and avoids claiming
-to hear a specific flaw from broad measurements. The mix-decision call now
-receives both vocal and instrumental levels, including their levels after the
-per-stem peak normalization used by the mixer. Raw input RMS differences alone
-must not trigger an automatic vocal boost. The instrumental is resampled to the
-vocal sample rate before comparison and mixing.
+For the single-audio mastering path, Luna makes one DSP decision call. Its rules
+retain the upstream project's useful cues (loudness within 2 LU of the target,
+crest factor below 6 dB, stereo width above 1.5, and bass side/mid ratio above
+0.3) while allowing neutral processing when measurements do not justify a
+change. Explicit client LUFS and peak requirements take priority over destination
+defaults; broad measurements do not justify claims about a precise resonance or
+completed broadcast compliance.
 
 References: [MixMaster AI upstream README](https://github.com/Tanzil-Ahmed/mixmaster-ai),
 [Pedalboard API](https://spotify.github.io/pedalboard/reference/pedalboard.html),
