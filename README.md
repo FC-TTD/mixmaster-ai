@@ -411,11 +411,15 @@ Numeric delivery instructions are parsed separately from the DSP settings:
 | `真峰值 -1 dBTP` | Enforce and verify a 4× oversampled *true-peak estimate* on both encoded channels |
 | `-14 LUFS` | Normalize toward the specified integrated loudness and verify within 0.25 LU |
 
-If the LUFS target and peak limit cannot both be met, the peak limit takes
-priority and the request fails with the measured shortfall. An unsupported bit
-depth, conflicting numeric values, an unsupported channel conversion, or a request
-for surround/Atmos or compressed output also fails with a clear message. The
-service does not certify every requirement of EBU R128, ATSC A/85, or BS.1770.
+For an explicit LUFS target, the exporter first uses overall gain. If isolated
+peaks block that target, it applies bounded transient limiting and rechecks the
+encoded result. This also works for short speech when integrated loudness can
+be measured. If the target and peak limit still cannot both be met, the peak
+limit takes priority and the request fails with the measured shortfall. An
+unsupported bit depth, conflicting numeric values, an unsupported channel
+conversion, or a request for surround/Atmos or compressed output also fails
+with a clear message. The service does not certify every requirement of EBU
+R128, ATSC A/85, or BS.1770.
 For such deliveries, the client should provide the exact numeric/file specs and
 complete external compliance review as needed.
 

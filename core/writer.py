@@ -4,6 +4,7 @@ from pathlib import Path
 
 import numpy as np
 import pyloudnorm
+from pedalboard import Limiter
 from scipy.signal import resample_poly
 import soundfile as sf
 
@@ -30,6 +31,76 @@ def _true_peak(audio: np.ndarray) -> float:
             if middle.size:
                 highest = max(highest, float(np.max(np.abs(middle))))
     return _dbfs(highest)
+
+
+def _cap_peaks(audio: np.ndarray, sample_cap: float, true_cap: float | None) -> np.ndarray:
+    """Apply final output gain against the requested sample and true-peak ceilings."""
+    reduction = max(0.0, _dbfs(float(np.max(np.abs(audio)))) - sample_cap)
+    if true_cap is not None:
+        reduction = max(reduction, _true_peak(audio) - true_cap)
+    if reduction:
+        # Leave room for PCM quantization and the finite 4x true-peak estimate.
+        audio = audio * 10 ** (-(reduction + 0.1) / 20.0)
+    return audio
+
+
+def _control_peaks_for_loudness(
+    audio: np.ndarray,
+    sample_rate: int,
+    meter: pyloudnorm.Meter,
+    target: float,
+    sample_cap: float,
+    true_cap: float | None,
+) -> np.ndarray:
+    """Limit short transients before final gain instead of lowering the whole programme.
+
+    Pedalboard's Limiter threshold controls compression, not the exported peak.
+    Its makeup gain can reach 0 dBFS, so the final ceiling is always checked
+    and applied independently. Keep the extra drive bounded to protect audio.
+    """
+    source = audio.astype(np.float32)
+    def meter_input(x: np.ndarray) -> np.ndarray:
+        return x.T if x.shape[0] == 2 else x[0]
+
+    best: np.ndarray | None = None
+    best_error = float("inf")
+    for threshold in (-0.3, -3.0, -6.0):
+        limiter = Limiter(threshold_db=threshold, release_ms=80.0)
+
+        def render(drive_db: float) -> tuple[np.ndarray, float]:
+            driven = source * np.float32(10 ** (drive_db / 20.0))
+            limited = limiter.process(driven, sample_rate, reset=True).astype(np.float64)
+            capped = _cap_peaks(limited, sample_cap, true_cap)
+            loudness = float(meter.integrated_loudness(meter_input(capped)))
+            return capped, loudness
+
+        low, high = -6.0, 8.0
+        bounds = {}
+        for drive in (0.0, low, high):
+            candidate, loudness = render(drive)
+            bounds[drive] = loudness
+            error = abs(loudness - target)
+            if error < best_error:
+                best, best_error = candidate, error
+            if error <= 0.2:
+                return candidate
+        if bounds[high] < target - 0.25 or bounds[low] > target + 0.25:
+            continue
+        for _ in range(8):
+            middle = (low + high) / 2.0
+            candidate, loudness = render(middle)
+            error = abs(loudness - target)
+            if error < best_error:
+                best, best_error = candidate, error
+            if error <= 0.2:
+                return candidate
+            if loudness < target:
+                low = middle
+            else:
+                high = middle
+    if best is None:
+        raise ValueError("峰值控制后无法测量综合响度。")
+    return best
 
 
 def write(job: Job, bit_depth: int = 24) -> Path:
@@ -70,13 +141,12 @@ def write(job: Job, bit_depth: int = 24) -> Path:
 
     sample_cap = min(-0.3, spec.max_sample_peak_dbfs if spec.max_sample_peak_dbfs is not None else 0.0)
     true_cap = spec.max_true_peak_dbtp
-    peak = _dbfs(float(np.max(np.abs(audio))))
-    gain_reduction = max(0.0, peak - sample_cap)
-    if true_cap is not None:
-        gain_reduction = max(gain_reduction, _true_peak(audio) - true_cap)
-    # Margin covers quantization/dither and the finite 4x true-peak estimate.
-    if gain_reduction:
-        audio *= 10 ** (-(gain_reduction + 0.1) / 20.0)
+    capped = _cap_peaks(audio, sample_cap, true_cap)
+    capped_lufs = float(meter.integrated_loudness(capped.T if capped.shape[0] == 2 else capped[0]))
+    if spec.target_lufs is not None and capped_lufs < target - 0.25:
+        audio = _control_peaks_for_loudness(audio, sample_rate, meter, target, sample_cap, true_cap)
+    else:
+        audio = capped
 
     if bit_depth == 16:
         lsb = 2.0 / (2 ** bit_depth)

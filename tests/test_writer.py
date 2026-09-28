@@ -1,5 +1,6 @@
 import pytest
 import numpy as np
+import pyloudnorm
 import soundfile as sf
 from pathlib import Path
 from core.job import load_audio
@@ -125,6 +126,25 @@ def test_impossible_loudness_and_peak_reports_conflict(ready_job):
     with pytest.raises(ValueError, match="无法同时达到"):
         write(ready_job)
     assert not ready_job.output_path.exists()
+
+
+def test_short_mono_voice_with_sparse_peak_reaches_streaming_loudness(ready_job):
+    voice = ready_job.processed_audio[:1].astype(np.float64)
+    meter = pyloudnorm.Meter(ready_job.sample_rate)
+    original_lufs = meter.integrated_loudness(voice[0])
+    voice *= 10 ** ((-26.5 - original_lufs) / 20.0)
+    voice[0, ready_job.sample_rate] = 10 ** (-7.5 / 20.0)
+    ready_job.processed_audio = voice.astype(np.float32)
+    ready_job.num_channels = 1
+    ready_job.prompt = "按照流媒体作品标准输出，-14 LUFS"
+
+    result_path = write(ready_job)
+    data, sample_rate = sf.read(str(result_path))
+    actual_lufs = pyloudnorm.Meter(sample_rate).integrated_loudness(data)
+
+    assert data.ndim == 1
+    assert abs(actual_lufs + 14) <= 0.25
+    assert np.max(np.abs(data)) <= 10 ** (-0.3 / 20.0)
 
 
 def test_mono_delivery_keeps_mono_layout(ready_job):
