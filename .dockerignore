@@ -1,5 +1,9 @@
 .git
+.dockerignore
 .github
+ansible
+deploy.sh
+docker-compose*.yml
 .claude
 __pycache__
 *.pyc
@@ -18,3 +22,4 @@ tests
 docs
 ttd_onboarding_report.md
 ttd_preview_deployment_report.md
+ttd_deployment_report.md

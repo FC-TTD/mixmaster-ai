@@ -1,0 +1,19 @@
+---
+- name: Build immutable MixMaster AI image from a source snapshot
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    ci_project_name: mixmaster-ai
+    ci_project_path: "{{ playbook_dir }}/.."
+    ci_image_name: mixmaster-ai
+    ci_image_tag: source-only
+    ci_dockerfile_path: Dockerfile
+    ci_compose_file_path: "{{ playbook_dir }}/../docker-compose.yml"
+    ci_build_host: ttd-nest
+    ci_buildkit_host: ttd-nest
+    ci_buildx_builder_name: hub-immutable-builder
+    ci_publish_label_tag: false
+    pt_skip_cd: true
+  roles:
+    - role: docker_ci_cd

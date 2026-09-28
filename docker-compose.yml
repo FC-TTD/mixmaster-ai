@@ -1,9 +1,6 @@
 services:
   mixmaster-ai:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    image: mixmaster-ai:1.0.0-ttd
+    image: ${MIXMASTER_IMAGE:?Set an immutable MixMaster AI image}
     container_name: mixmaster-ai
     init: true
     restart: unless-stopped
