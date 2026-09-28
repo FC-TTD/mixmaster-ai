@@ -205,11 +205,12 @@ with gr.Blocks(title="MixMaster AI") as demo:
                 type="filepath",
                 label="主音频",
             )
-            gr.Markdown("**伴奏**  \n可选。上传伴奏后自动触发“贴唱混音”模式。若只需对单一音轨做母带处理，请留空。")
-            instrumental_input = gr.Audio(
-                type="filepath",
-                label="伴奏",
-            )
+            with gr.Accordion(label="伴奏（可选）", open=False):
+                gr.Markdown("上传伴奏后自动触发“贴唱混音”模式。若只需对单一音轨做母带处理，请留空。")
+                instrumental_input = gr.Audio(
+                    type="filepath",
+                    label="伴奏",
+                )
             prompt_input = gr.Textbox(
                 label="声音要求",
                 placeholder="例如：提升人声清晰度使其更靠前、压制刺耳高频；对齐 YouTube 流媒体 -14 LUFS 响度标准；去除AI味，温暖点等",
