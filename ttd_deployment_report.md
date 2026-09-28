@@ -6,8 +6,8 @@
 - 主机与目录：`ttd-stage:/opt/mixmaster-ai`
 - Compose：`docker-compose.yml`
 - 容器：`mixmaster-ai`
-- 镜像：`registry.ttd/mixmaster-ai/mixmaster-ai:h-615c4fa22440`
-- 镜像 digest：`sha256:b967e6595d489a2c34bf5c716729f713001f38a9b12481f26a28a5f2e5e919c4`
+- 镜像：`registry.ttd/mixmaster-ai/mixmaster-ai:h-0c6f8f349e96`
+- 镜像 digest：`sha256:c2b1d37836744d64199a84da90d1bf8d5ffc81c05bc2686b61efb272c7e246e6`
 - 大模型：`gpt-6-luna`，通过 `http://aiproxy/v1` 调用
 - CPU 运行；保留原 `mixmaster-ai_mixmaster_ai_tmp` 卷与 `17862:7860` 端口映射。
 
@@ -29,6 +29,15 @@ ssh ttd-stage 'cd /opt/mixmaster-ai && MIXMASTER_IMAGE=registry.ttd/mixmaster-ai
 ```
 
 原预览版 Compose 和 `mixmaster-ai:preview` 镜像保留作回退参考，不再作为日常启动入口。正式部署配置位于本仓库的 `docker-compose.yml` 与 `Dockerfile`；模型及代理配置由主机私有 `.env` 提供。
+
+## 2026-09-29 Luna 平台归属修复发布
+
+- 正式 Compose 服务继续运行在 `root@ttd-stage:/opt/mixmaster-ai`，原入口 `http://ttd-stage:17862/`，无端口、卷或私有 `.env` 变更。变更的业务入口是单音频 `/master` 及同一母带处理路径的 Gradio 界面；模型对自然语言平台做分类，在一次响应中选用一套有来源的响度、真峰值参考及 DSP 参数。客户明确数值逐项覆盖预设。
+- 源码提交 `43f293c8d65e095b7ec374fc81f50a6109dda088`；只读 `git archive` SHA-256 为 `0c6f8f349e962f06772a85ae8265e8e0f90846c1e333c14aef57471431210494`，构建前后相同。Dockerfile、Compose、部署脚本的 SHA-256 分别为 `82941e258f370693128164504a542effd0289a24341434fb5908f3abfbf42bfb`、`1017b4f7c349cf3070ddab1f29afaf86e549a3a2374eacf53319067b9055daab`、`e4fd8b9bc41f77b3986a2b5b7b90c292c5dcb473e760a91e29abe297cd5b1fd7`。
+- 构建机 `ttd-nest` 的 root SSH 被拒；备用构建在 `ttd-stage` 的 Docker BuildKit 上从上述 tar 归档输入完成。独立 BuildKit 容器首次拉取受 Docker Hub 网络超时阻挡，遂使用已运行的默认 BuildKit。初次构建系统层命中缓存，Python 依赖层重新构建；同输入重复构建时全部应用层命中缓存，镜像摘要仍为 `sha256:c2b1d37836744d64199a84da90d1bf8d5ffc81c05bc2686b61efb272c7e246e6`。仅发布不可变 `h-*` 镜像；正式镜像内运行 `128 passed`。
+- 部署前镜像 `h-57444ab456d0`（digest `sha256:28fd29f48acea93a5b2710ba0bff47505432bae178bbfd3cd7f65064f43bee5f`）。`deploy.sh deploy` 备份 Compose 为 `/opt/mixmaster-ai/docker-compose.rollback.yml` 并切换到新镜像；前后 Compose 文件 SHA-256 均为 `1017b4f7c349cf3070ddab1f29afaf86e549a3a2374eacf53319067b9055daab`。Compose 管理状态与容器运行镜像一致，原 `mixmaster-ai_mixmaster_ai_tmp` 卷保留；容器为 `healthy`，页面 HTTP 200。
+- 真实业务验收：从服务外部以合成立体声 WAV 分别请求 `/master`，原句“在CCTV播放”“在BBC播放”“在小红书播放”均 HTTP 200，返回 24-bit WAV。FFmpeg 独立测得综合响度分别为 `-23.9`、`-22.9`、`-14.9 LUFS`，真峰值分别为 `-22.3`、`-21.3`、`-13.3 dBFS`（真峰值估计，均低于相应 `-2`、`-1`、`-1 dBTP` 上限）。BBC 加上客户明确的 `-20 LUFS / <=-2 dBTP` 后，响度测得 `-19.9 LUFS`、真峰值 `-18.3 dBFS`；单元测试另核对显式真峰值逐项优先与来源标注。短视频移动端数值在产品中标为工作参考，并非小红书官方交付标准。上述合成样本只验证当前音频链路，不构成电视台完整文件交付认证。
+- 回退：在 `ttd-stage:/opt/mixmaster-ai` 恢复 `docker-compose.rollback.yml` 为 `docker-compose.yml`，再运行 `MIXMASTER_IMAGE=registry.ttd/mixmaster-ai/mixmaster-ai:h-57444ab456d0 docker compose up -d --no-build`，保留原私有 `.env` 与命名卷。此次未变更数据结构；旧镜像仍可用。
 
 ## 2026-09-28 伴奏区域折叠发布
 
