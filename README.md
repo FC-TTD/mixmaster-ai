@@ -352,7 +352,7 @@ To use a cheaper model, change `claude-opus-4-5` to `claude-sonnet-4-5` in `core
 
 The TTD release keeps the original master-only and mix-and-master workflows, with a Chinese UI and an OpenAI-compatible DSP decision path. The current internal service is `http://ttd-stage:17862/`; it uses `gpt-6-luna` through `http://aiproxy/v1`. The mastering prompt is based on the upstream project's measured audio features, DSP chain, and parameter schema. The Anthropic path remains available through `LLM_PROVIDER=anthropic`.
 
-The supported deployment definition is `docker-compose.yml` with `Dockerfile`. Put credentials in a private `.env` on the host; they are excluded from the image. See [TTD deployment record](ttd_deployment_report.md) for service checks and release verification. The older `docker-compose.preview.yml` is retained only as a rollback reference.
+The supported deployment definition is `docker-compose.yml` with `Dockerfile` and `deploy.sh`. Formal builds use a read-only archive of the recorded source commit and publish only an immutable `h-*` image through `deploy.sh build`. Set `MIXMASTER_IMAGE` to that image before running `deploy.sh deploy` or `docker compose`; the Compose file requires this value. Put credentials in a private `.env` on the host; they are excluded from the image. See [TTD deployment record](ttd_deployment_report.md) for the current image, service checks, and rollback details. The older `docker-compose.preview.yml` is retained only as a rollback reference.
 
 ---
 
