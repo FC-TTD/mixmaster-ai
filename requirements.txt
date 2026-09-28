@@ -1,7 +1,7 @@
 anthropic
 openai
 python-dotenv
-pedalboard
+pedalboard==0.9.24
 librosa
 pyloudnorm
 scipy
@@ -9,6 +9,6 @@ numpy
 soundfile
 pydantic>=2.0
 fastapi
-gradio
+gradio==6.22.0
 matchering
 pytest
