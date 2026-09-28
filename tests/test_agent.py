@@ -4,7 +4,7 @@ import soundfile as sf
 from pathlib import Path
 from unittest.mock import patch, MagicMock
 from core.job import load_audio
-from core.agent import decide
+from core.agent import decide, _validated_openai_decision
 from core.schemas import DSPDecisions
 
 
@@ -144,3 +144,12 @@ def test_decide_on_api_error(analysis_job):
 
     assert analysis_job.status == "error"
     assert analysis_job.error == "API failure"
+
+
+def test_openai_repairs_invalid_decision_once():
+    valid = _make_fake_response().content[-1].input
+    with patch("core.agent._call_openai_json", side_effect=[{"target_lufs": -14}, valid]) as call:
+        result = _validated_openai_decision(DSPDecisions, "rules", "brief")
+    assert result.target_lufs == -14
+    assert call.call_count == 2
+    assert "failed schema validation" in call.call_args.args[1]

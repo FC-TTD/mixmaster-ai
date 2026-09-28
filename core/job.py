@@ -5,6 +5,7 @@ from pathlib import Path
 import numpy as np
 
 from core.schemas import DSPDecisions, MixDecisions
+from core.delivery import DeliverySpec
 
 
 @dataclass
@@ -23,6 +24,10 @@ class Job:
     processed_audio: np.ndarray | None = None
     loudness_lufs: float | None = None
     true_peak_dbtp: float | None = None
+    delivery_spec: DeliverySpec | None = None
+    output_sample_rate: int | None = None
+    output_bit_depth: int | None = None
+    output_sample_peak_dbfs: float | None = None
     status: str = "pending"
     error: str | None = None
 

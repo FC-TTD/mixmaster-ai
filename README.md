@@ -389,3 +389,42 @@ Licensed under the Apache License 2.0 - see the [LICENSE](LICENSE) file for deta
 - [pedalboard](https://github.com/spotify/pedalboard) by Spotify for DSP primitives
 - [librosa](https://librosa.org) for audio analysis
 - [pyloudnorm](https://github.com/csteinmetz1/pyloudnorm) for LUFS metering
+
+## FC-TTD natural-language delivery rules
+
+The TTD deployment uses GPT-6 Luna to choose creative EQ, compression, saturation,
+stereo, and limiting settings from measured audio features and the client brief.
+The model receives measurements, not playable audio, so it must not claim to have
+heard a specific defect. The original project documents a mastering chain of
+corrective EQ, compression, tonal EQ, saturation, stereo imaging, and limiting,
+plus 16-bit PCM, 24-bit PCM, and 32-bit float WAV export. These are the supported
+production capabilities, not a claim of automated broadcast certification.
+
+Numeric delivery instructions are parsed separately from the DSP settings:
+
+| Client instruction | Export behavior |
+| --- | --- |
+| `48 kHz` | Resample the final WAV to 48,000 Hz |
+| `立体声` / `单声道` | Verify the uploaded or mixed audio has the requested channel layout; do not invent missing stereo information |
+| `16-bit`, `24-bit PCM`, `32-bit float` | Select the corresponding WAV subtype; an explicit brief overrides the UI's default 24-bit selection |
+| `最大峰值 -12 dBFS` | Enforce and verify the *sample* peak of the encoded WAV |
+| `真峰值 -1 dBTP` | Enforce and verify a 4× oversampled *true-peak estimate* on both encoded channels |
+| `-14 LUFS` | Normalize toward the specified integrated loudness and verify within 0.25 LU |
+
+If the LUFS target and peak limit cannot both be met, the peak limit takes
+priority and the request fails with the measured shortfall. An unsupported bit
+depth, conflicting numeric values, an unavailable channel layout, or a request
+for surround/Atmos or compressed output also fails with a clear message. The
+service does not certify every requirement of EBU R128, ATSC A/85, or BS.1770.
+For such deliveries, the client should provide the exact numeric/file specs and
+complete external compliance review as needed.
+
+This distinction matters because Spotify Pedalboard documents `Limiter.threshold_db`
+as a compression threshold, not an output ceiling. The final encoded WAV is
+measured after loudness normalization, sample-rate conversion, and quantization.
+A 4× true-peak estimate helps prevent intersample overshoot but is not a formal
+broadcast compliance certificate.
+
+References: [MixMaster AI upstream README](https://github.com/Tanzil-Ahmed/mixmaster-ai),
+[Pedalboard API](https://spotify.github.io/pedalboard/reference/pedalboard.html),
+[EBU Tech 3343](https://tech.ebu.ch/docs/tech/tech3343.pdf).

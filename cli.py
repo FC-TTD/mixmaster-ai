@@ -25,7 +25,7 @@ def _master_pipeline(job, bit_depth):
         if attempt < 1:
             old = job.dsp_decisions.limiter
             job.dsp_decisions.limiter = LimiterSettings(
-                ceiling_dbtp=max(old.ceiling_dbtp - 1.0, -3.0),
+                ceiling_dbtp=max(old.ceiling_dbtp - 1.0, -24.0),
                 release_ms=old.release_ms,
             )
             job.processed_audio = None

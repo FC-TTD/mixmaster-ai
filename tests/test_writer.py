@@ -5,6 +5,7 @@ from pathlib import Path
 from core.job import load_audio
 from core.processor import process
 from core.writer import write
+from core.writer import _true_peak
 from core.schemas import (
     DSPDecisions, EQSettings, EQBand,
     CompressorSettings, SaturatorSettings,
@@ -92,3 +93,43 @@ def test_write_32bit_float(ready_job):
     data, sr = sf.read(str(result_path))
     assert sr == ready_job.sample_rate
     assert data.shape[0] > 0
+
+
+def test_write_respects_broadcast_peak_ceiling(ready_job):
+    ready_job.prompt = "立体声 48 kHz / 24-bit PCM，最大峰值不得超过 -12 dBFS"
+    requested_peak = 10 ** (-12.0 / 20.0)
+    unbounded_audio = ready_job.processed_audio * 10 ** (
+        (ready_job.dsp_decisions.target_lufs - ready_job.loudness_lufs) / 20.0
+    )
+    assert np.max(np.abs(unbounded_audio)) > requested_peak
+
+    result_path = write(ready_job, bit_depth=24)
+    data, sample_rate = sf.read(str(result_path))
+
+    assert sample_rate == 48000
+    assert sf.info(str(result_path)).subtype == "PCM_24"
+    assert data.shape[1] == 2
+    assert np.max(np.abs(data)) <= requested_peak
+
+
+def test_write_respects_true_peak_of_encoded_audio(ready_job):
+    ready_job.prompt = "48 kHz，真峰值不得超过 -6 dBTP"
+    result_path = write(ready_job, bit_depth=24)
+    data, sample_rate = sf.read(str(result_path), always_2d=True)
+    assert sample_rate == 48000
+    assert _true_peak(data.T) <= -6 + 0.05
+
+
+def test_impossible_loudness_and_peak_reports_conflict(ready_job):
+    ready_job.prompt = "-6 LUFS，最大峰值 -12 dBFS"
+    with pytest.raises(ValueError, match="无法同时达到"):
+        write(ready_job)
+    assert not ready_job.output_path.exists()
+
+
+def test_mono_delivery_keeps_mono_layout(ready_job):
+    ready_job.processed_audio = ready_job.processed_audio[:1]
+    ready_job.num_channels = 1
+    ready_job.prompt = "单声道 24-bit PCM"
+    result_path = write(ready_job)
+    assert sf.info(str(result_path)).channels == 1

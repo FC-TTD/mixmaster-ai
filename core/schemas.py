@@ -34,7 +34,7 @@ class StereoImageSettings(BaseModel):
 
 
 class LimiterSettings(BaseModel):
-    ceiling_dbtp: float = Field(..., ge=-3.0, le=0.0)
+    ceiling_dbtp: float = Field(..., ge=-24.0, le=0.0, description="Legacy field name: Pedalboard Limiter compression threshold in dB, not a final output ceiling in dBTP.")
     release_ms: float = Field(..., ge=50.0, le=500.0)
 
 
@@ -45,7 +45,7 @@ class DSPDecisions(BaseModel):
     saturator: SaturatorSettings
     stereo_image: StereoImageSettings
     limiter: LimiterSettings
-    target_lufs: float = Field(..., ge=-23.0, le=-6.0)
+    target_lufs: float = Field(..., ge=-40.0, le=-6.0)
     reasoning: str
 
 
