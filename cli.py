@@ -9,6 +9,7 @@ from core.job import load_audio
 from core.analyzer import analyze
 from core.agent import decide, decide_mix
 from core.mixer import mix_tracks
+from core.mix_context import align_instrumental
 from core.processor import process
 from core.schemas import LimiterSettings
 from core.writer import write
@@ -107,10 +108,11 @@ def main():
 
         vocal_job = load_audio(vocal_path, output_path, args.prompt)
         instr_job = load_audio(instr_path, output_path, args.prompt)
+        instr_job = align_instrumental(instr_job, vocal_job.sample_rate)
 
         # Analyze vocal → mixing decisions
         vocal_job = analyze(vocal_job)
-        vocal_job = decide_mix(vocal_job)
+        vocal_job = decide_mix(vocal_job, instr_job)
 
         # Mix vocal + instrumental into one stereo array
         mixed_audio = mix_tracks(

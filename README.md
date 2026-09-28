@@ -425,6 +425,16 @@ measured after loudness normalization, sample-rate conversion, and quantization.
 A 4× true-peak estimate helps prevent intersample overshoot but is not a formal
 broadcast compliance certificate.
 
+The decision prompt retains the upstream project's useful dynamics and stereo
+heuristics (within 2 LU, crest factor below 6 dB, width above 1.5, and bass
+side/mid ratio above 0.3), but treats them as evidence rather than automatic
+processing commands. It keeps LUFS separate from peak limits and avoids claiming
+to hear a specific flaw from broad measurements. The mix-decision call now
+receives both vocal and instrumental levels, including their levels after the
+per-stem peak normalization used by the mixer. Raw input RMS differences alone
+must not trigger an automatic vocal boost. The instrumental is resampled to the
+vocal sample rate before comparison and mixing.
+
 References: [MixMaster AI upstream README](https://github.com/Tanzil-Ahmed/mixmaster-ai),
 [Pedalboard API](https://spotify.github.io/pedalboard/reference/pedalboard.html),
 [EBU Tech 3343](https://tech.ebu.ch/docs/tech/tech3343.pdf).

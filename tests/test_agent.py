@@ -4,7 +4,7 @@ import soundfile as sf
 from pathlib import Path
 from unittest.mock import patch, MagicMock
 from core.job import load_audio
-from core.agent import decide, _validated_openai_decision
+from core.agent import decide, decide_mix, _validated_openai_decision
 from core.schemas import DSPDecisions
 
 
@@ -153,3 +153,18 @@ def test_openai_repairs_invalid_decision_once():
     assert result.target_lufs == -14
     assert call.call_count == 2
     assert "failed schema validation" in call.call_args.args[1]
+
+
+def test_mix_decision_receives_both_stems(analysis_job, monkeypatch):
+    monkeypatch.setenv("LLM_PROVIDER", "openai")
+    instrumental = load_audio(
+        analysis_job.input_path,
+        analysis_job.output_path,
+        analysis_job.prompt,
+    )
+    with patch("core.agent._validated_openai_decision", return_value=MagicMock()) as call:
+        decide_mix(analysis_job, instrumental)
+    user_message = call.call_args.args[2]
+    assert "<vocal_audio" in user_message
+    assert "<instrumental_audio" in user_message
+    assert "vocal_minus_instrumental_normalized_mid_rms_db" in user_message
